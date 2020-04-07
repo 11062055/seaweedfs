@@ -12,7 +12,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/storage/needle"
 	"github.com/chrislusf/seaweedfs/weed/storage/super_block"
 )
-
+/// 保存 volume 到 机器 的映射, 是 机器 到 volume 的 逆, 以方便查询
 // mapping from volume to its locations, inverted from server to volume
 type VolumeLayout struct {
 	rp               *super_block.ReplicaPlacement
@@ -49,6 +49,7 @@ func (vl *VolumeLayout) String() string {
 	return fmt.Sprintf("rp:%v, ttl:%v, vid2location:%v, writables:%v, volumeSizeLimit:%v", vl.rp, vl.ttl, vl.vid2location, vl.writables, vl.volumeSizeLimit)
 }
 
+/// 注册 新增 volume data node
 func (vl *VolumeLayout) RegisterVolume(v *storage.VolumeInfo, dn *DataNode) {
 	vl.accessLock.Lock()
 	defer vl.accessLock.Unlock()
@@ -57,8 +58,10 @@ func (vl *VolumeLayout) RegisterVolume(v *storage.VolumeInfo, dn *DataNode) {
 	defer vl.rememberOversizedVolume(v)
 
 	if _, ok := vl.vid2location[v.Id]; !ok {
+		/// type VolumeLocationList struct { list []*DataNode }
 		vl.vid2location[v.Id] = NewVolumeLocationList()
 	}
+	/// 将一个 data node 加入到 同一个 volume 的 list 中去
 	vl.vid2location[v.Id].Set(dn)
 	// glog.V(4).Infof("volume %d added to %s len %d copy %d", v.Id, dn.Id(), vl.vid2location[v.Id].Length(), v.ReplicaPlacement.GetCopyCount())
 	for _, dn := range vl.vid2location[v.Id].list {
@@ -87,6 +90,7 @@ func (vl *VolumeLayout) rememberOversizedVolume(v *storage.VolumeInfo) {
 	}
 }
 
+/// 反注册一个 卷 volume
 func (vl *VolumeLayout) UnRegisterVolume(v *storage.VolumeInfo, dn *DataNode) {
 	vl.accessLock.Lock()
 	defer vl.accessLock.Unlock()
@@ -97,6 +101,7 @@ func (vl *VolumeLayout) UnRegisterVolume(v *storage.VolumeInfo, dn *DataNode) {
 		return
 	}
 
+	/// 从 VolumeLocationList 中 删除 node 节点
 	if location.Remove(dn) {
 
 		vl.ensureCorrectWritables(v)
@@ -109,6 +114,8 @@ func (vl *VolumeLayout) UnRegisterVolume(v *storage.VolumeInfo, dn *DataNode) {
 }
 
 func (vl *VolumeLayout) ensureCorrectWritables(v *storage.VolumeInfo) {
+	/// 卷可写 vl.rp.GetCopyCount() = rp.DiffDataCenterCount + rp.DiffRackCount + rp.SameRackCount + 1
+	/// 只有这么多个副本的时候才是可写的, 保证了强一致性
 	if vl.enoughCopies(v.Id) && vl.isWritable(v) {
 		if _, ok := vl.oversizedVolumes[v.Id]; !ok {
 			vl.setVolumeWritable(v.Id)
@@ -135,6 +142,7 @@ func (vl *VolumeLayout) isEmpty() bool {
 	return len(vl.vid2location) == 0
 }
 
+/// 被 collection 的 Lookup 方法调用
 func (vl *VolumeLayout) Lookup(vid needle.VolumeId) []*DataNode {
 	vl.accessLock.RLock()
 	defer vl.accessLock.RUnlock()
@@ -145,6 +153,7 @@ func (vl *VolumeLayout) Lookup(vid needle.VolumeId) []*DataNode {
 	return nil
 }
 
+/// 列出所有 数据 节点 map 中获取
 func (vl *VolumeLayout) ListVolumeServers() (nodes []*DataNode) {
 	vl.accessLock.RLock()
 	defer vl.accessLock.RUnlock()
@@ -155,6 +164,7 @@ func (vl *VolumeLayout) ListVolumeServers() (nodes []*DataNode) {
 	return
 }
 
+/// 根据 数据中心 机架 节点 获取机器列表, 本地操作
 func (vl *VolumeLayout) PickForWrite(count uint64, option *VolumeGrowOption) (*needle.VolumeId, uint64, *VolumeLocationList, error) {
 	vl.accessLock.RLock()
 	defer vl.accessLock.RUnlock()
@@ -194,7 +204,7 @@ func (vl *VolumeLayout) PickForWrite(count uint64, option *VolumeGrowOption) (*n
 	}
 	return &vid, count, locationList, nil
 }
-
+/// 查看可写的 volume
 func (vl *VolumeLayout) GetActiveVolumeCount(option *VolumeGrowOption) int {
 	vl.accessLock.RLock()
 	defer vl.accessLock.RUnlock()
@@ -203,6 +213,7 @@ func (vl *VolumeLayout) GetActiveVolumeCount(option *VolumeGrowOption) int {
 		return len(vl.writables)
 	}
 	counter := 0
+	/// 遍历所有的 volume id 获取对应的 location, 如果对应的数据中心是目标数据中心, 再比较机架和节点是否是目标机架和节点
 	for _, v := range vl.writables {
 		for _, dn := range vl.vid2location[v].list {
 			if dn.GetDataCenter().Id() == NodeId(option.DataCenter) {
@@ -219,6 +230,7 @@ func (vl *VolumeLayout) GetActiveVolumeCount(option *VolumeGrowOption) int {
 	return counter
 }
 
+/// 从可写表中移除
 func (vl *VolumeLayout) removeFromWritable(vid needle.VolumeId) bool {
 	toDeleteIndex := -1
 	for k, id := range vl.writables {
@@ -245,6 +257,7 @@ func (vl *VolumeLayout) setVolumeWritable(vid needle.VolumeId) bool {
 	return true
 }
 
+/// 从 VolumeLocationList 中 remove, 再从 VolumeLayout 的 可写列表中删除
 func (vl *VolumeLayout) SetVolumeUnavailable(dn *DataNode, vid needle.VolumeId) bool {
 	vl.accessLock.Lock()
 	defer vl.accessLock.Unlock()
@@ -259,6 +272,7 @@ func (vl *VolumeLayout) SetVolumeUnavailable(dn *DataNode, vid needle.VolumeId) 
 	}
 	return false
 }
+/// 添加到 VolumeLocationList 中, 再添加到 VolumeLayout 的 可写列表中
 func (vl *VolumeLayout) SetVolumeAvailable(dn *DataNode, vid needle.VolumeId, isReadOnly bool) bool {
 	vl.accessLock.Lock()
 	defer vl.accessLock.Unlock()
@@ -286,6 +300,7 @@ func (vl *VolumeLayout) enoughCopies(vid needle.VolumeId) bool {
 	return locations == desired || (vl.replicationAsMin && locations > desired)
 }
 
+/// 将一个 volume id 从 VolumeLayout 的 writable 列表中删除
 func (vl *VolumeLayout) SetVolumeCapacityFull(vid needle.VolumeId) bool {
 	vl.accessLock.Lock()
 	defer vl.accessLock.Unlock()
@@ -294,6 +309,7 @@ func (vl *VolumeLayout) SetVolumeCapacityFull(vid needle.VolumeId) bool {
 	return vl.removeFromWritable(vid)
 }
 
+/// 用于统计输出 被 上层 topology 的 ToMap 调用
 func (vl *VolumeLayout) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 	m["replication"] = vl.rp.String()
@@ -303,6 +319,7 @@ func (vl *VolumeLayout) ToMap() map[string]interface{} {
 	return m
 }
 
+/// 获取统计信息 本地操作
 func (vl *VolumeLayout) Stats() *VolumeLayoutStats {
 	vl.accessLock.RLock()
 	defer vl.accessLock.RUnlock()
@@ -312,6 +329,7 @@ func (vl *VolumeLayout) Stats() *VolumeLayoutStats {
 	freshThreshold := time.Now().Unix() - 60
 
 	for vid, vll := range vl.vid2location {
+		/// 调用 VolumeLocationList 的 Stats 获取统计信息
 		size, fileCount := vll.Stats(vid, freshThreshold)
 		ret.FileCount += uint64(fileCount)
 		ret.UsedSize += size

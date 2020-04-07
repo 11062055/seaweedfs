@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+/// 所有可执行的命令
 var Commands = []*Command{
 	cmdBenchmark,
 	cmdBackup,
@@ -31,6 +32,7 @@ var Commands = []*Command{
 	cmdWebDav,
 }
 
+/// 命令结构体
 type Command struct {
 	// Run runs the command.
 	// The args are the arguments after the command name.

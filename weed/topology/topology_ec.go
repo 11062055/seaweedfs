@@ -12,6 +12,7 @@ type EcShardLocations struct {
 	Locations  [erasure_coding.TotalShardsCount][]*DataNode
 }
 
+/// 更新 topology 中的 ec shard 信息 和 data node 中的 ec shard 反向索引信息
 func (t *Topology) SyncDataNodeEcShards(shardInfos []*master_pb.VolumeEcShardInformationMessage, dn *DataNode) (newShards, deletedShards []*erasure_coding.EcVolumeInfo) {
 	// convert into in memory struct storage.VolumeInfo
 	var shards []*erasure_coding.EcVolumeInfo
@@ -23,8 +24,10 @@ func (t *Topology) SyncDataNodeEcShards(shardInfos []*master_pb.VolumeEcShardInf
 				erasure_coding.ShardBits(shardInfo.EcIndexBits)))
 	}
 	// find out the delta volumes
+	/// 更新 data node 到 shard 的反向索引信息
 	newShards, deletedShards = dn.UpdateEcShards(shards)
 	for _, v := range newShards {
+		/// 向一个 shard 中 增加一个节点
 		t.RegisterEcShards(v, dn)
 	}
 	for _, v := range deletedShards {
@@ -33,6 +36,7 @@ func (t *Topology) SyncDataNodeEcShards(shardInfos []*master_pb.VolumeEcShardInf
 	return
 }
 
+/// 更新 topology 和 对应的 data node 的 ec shard 反向索引信息
 func (t *Topology) IncrementalSyncDataNodeEcShards(newEcShards, deletedEcShards []*master_pb.VolumeEcShardInformationMessage, dn *DataNode) {
 	// convert into in memory struct storage.VolumeInfo
 	var newShards, deletedShards []*erasure_coding.EcVolumeInfo
@@ -51,9 +55,11 @@ func (t *Topology) IncrementalSyncDataNodeEcShards(newEcShards, deletedEcShards 
 				erasure_coding.ShardBits(shardInfo.EcIndexBits)))
 	}
 
+	/// data node 要记录到 shard 的反向索引信息
 	dn.DeltaUpdateEcShards(newShards, deletedShards)
 
 	for _, v := range newShards {
+		/// 将 ec shard 的信息 记录到 topology 中
 		t.RegisterEcShards(v, dn)
 	}
 	for _, v := range deletedShards {
@@ -68,6 +74,7 @@ func NewEcShardLocations(collection string) *EcShardLocations {
 	}
 }
 
+/// 向一个 shard 中 增加一个节点
 func (loc *EcShardLocations) AddShard(shardId erasure_coding.ShardId, dn *DataNode) (added bool) {
 	dataNodes := loc.Locations[shardId]
 	for _, n := range dataNodes {
@@ -94,6 +101,7 @@ func (loc *EcShardLocations) DeleteShard(shardId erasure_coding.ShardId, dn *Dat
 	return true
 }
 
+/// 将 ec shard 的信息 记录到 topology 中
 func (t *Topology) RegisterEcShards(ecShardInfos *erasure_coding.EcVolumeInfo, dn *DataNode) {
 
 	t.ecShardMapLock.Lock()

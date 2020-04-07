@@ -12,6 +12,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/storage/needle"
 )
 
+/// 获取各个 volume id 的 location 信息, 从 map 中获取
 func (ms *MasterServer) lookupVolumeId(vids []string, collection string) (volumeLocations map[string]operation.LookupResult) {
 	volumeLocations = make(map[string]operation.LookupResult)
 	for _, vid := range vids {
@@ -27,6 +28,7 @@ func (ms *MasterServer) lookupVolumeId(vids []string, collection string) (volume
 	return
 }
 
+/// 根据 collection 和 volume id 获取节点位置, 从 map 中获取
 // If "fileId" is provided, this returns the fileId location and a JWT to update or delete the file.
 // If "volumeId" is provided, this only returns the volumeId location
 func (ms *MasterServer) dirLookupHandler(w http.ResponseWriter, r *http.Request) {
@@ -58,16 +60,19 @@ func (ms *MasterServer) dirLookupHandler(w http.ResponseWriter, r *http.Request)
 	writeJsonQuiet(w, r, httpStatus, location)
 }
 
+/// 根据 collection 和 volume id 查找位置
 // findVolumeLocation finds the volume location from master topo if it is leader,
 // or from master client if not leader
 func (ms *MasterServer) findVolumeLocation(collection, vid string) operation.LookupResult {
 	var locations []operation.Location
 	var err error
+	/// 如果是 leader master
 	if ms.Topo.IsLeader() {
 		volumeId, newVolumeIdErr := needle.NewVolumeId(vid)
 		if newVolumeIdErr != nil {
 			err = fmt.Errorf("Unknown volume id %s", vid)
 		} else {
+			/// 查找 特定 volume id 的位置, 会递归调用 Collection 和 VolumeLayout 的 Lookup 方法, 都是从 map 中获取
 			machines := ms.Topo.Lookup(collection, volumeId)
 			for _, loc := range machines {
 				locations = append(locations, operation.Location{Url: loc.Url(), PublicUrl: loc.PublicUrl})
@@ -77,6 +82,7 @@ func (ms *MasterServer) findVolumeLocation(collection, vid string) operation.Loo
 			}
 		}
 	} else {
+		/// 从 vidMap 中获取数据
 		machines, getVidLocationsErr := ms.MasterClient.GetVidLocations(vid)
 		for _, loc := range machines {
 			locations = append(locations, operation.Location{Url: loc.Url, PublicUrl: loc.PublicUrl})
@@ -93,6 +99,7 @@ func (ms *MasterServer) findVolumeLocation(collection, vid string) operation.Loo
 	return ret
 }
 
+/// 分配节点 用于存储数据
 func (ms *MasterServer) dirAssignHandler(w http.ResponseWriter, r *http.Request) {
 	stats.AssignRequest()
 	requestedCount, e := strconv.ParseUint(r.FormValue("count"), 10, 64)
@@ -105,12 +112,14 @@ func (ms *MasterServer) dirAssignHandler(w http.ResponseWriter, r *http.Request)
 		writableVolumeCount = 0
 	}
 
+	/// 获取 topology.VolumeGrowOption 里面包含数据中心、机架、节点等信息
 	option, err := ms.getVolumeGrowOption(r)
 	if err != nil {
 		writeJsonQuiet(w, r, http.StatusNotAcceptable, operation.AssignResult{Error: err.Error()})
 		return
 	}
 
+	/// 如果对应数据中心\机架\节点没有可写的volume
 	if !ms.Topo.HasWritableVolume(option) {
 		if ms.Topo.FreeSpace() <= 0 {
 			writeJsonQuiet(w, r, http.StatusNotFound, operation.AssignResult{Error: "No free volumes left!"})
@@ -119,6 +128,7 @@ func (ms *MasterServer) dirAssignHandler(w http.ResponseWriter, r *http.Request)
 		ms.vgLock.Lock()
 		defer ms.vgLock.Unlock()
 		if !ms.Topo.HasWritableVolume(option) {
+			/// 如果没有可写节点, 就进行扩容
 			if _, err = ms.vg.AutomaticGrowByType(option, ms.grpcDialOption, ms.Topo, writableVolumeCount); err != nil {
 				writeJsonError(w, r, http.StatusInternalServerError,
 					fmt.Errorf("Cannot grow volume group! %v", err))

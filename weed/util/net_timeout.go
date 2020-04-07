@@ -74,6 +74,7 @@ func (c *Conn) Close() error {
 	return c.Conn.Close()
 }
 
+/// 生成一个新的listen结构体
 func NewListener(addr string, timeout time.Duration) (net.Listener, error) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {

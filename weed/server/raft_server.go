@@ -28,6 +28,7 @@ type RaftServer struct {
 	*raft.GrpcServer
 }
 
+/// 生成一个 raft server
 func NewRaftServer(grpcDialOption grpc.DialOption, peers []string, serverAddr, dataDir string, topo *topology.Topology, pulseSeconds int) *RaftServer {
 	s := &RaftServer{
 		peers:      peers,
@@ -99,6 +100,7 @@ func (s *RaftServer) Peers() (members []string) {
 	return
 }
 
+/// 通过文件中 信息 对比 peer 是否已经改变
 func isPeersChanged(dir string, self string, peers []string) (oldPeers []string, changed bool) {
 	confPath := path.Join(dir, "conf")
 	// open conf file

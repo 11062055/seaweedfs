@@ -19,6 +19,7 @@ var ErrorNotFound = errors.New("not found")
 
 // isFileUnchanged checks whether this needle to write is same as last one.
 // It requires serialized access in the same volume.
+/// 比较文件是否改变, 先比 cookie, 再比 checksum, 再比 data
 func (v *Volume) isFileUnchanged(n *needle.Needle) bool {
 	if v.Ttl.String() != "" {
 		return false
@@ -41,6 +42,7 @@ func (v *Volume) isFileUnchanged(n *needle.Needle) bool {
 }
 
 // Destroy removes everything related to this volume
+/// 删除 volume 但是 正在 compacting 中的不被删除
 func (v *Volume) Destroy() (err error) {
 	if v.isCompacting {
 		err = fmt.Errorf("volume %d is compacting", v.Id)
@@ -79,6 +81,7 @@ func (v *Volume) writeNeedle(n *needle.Needle) (offset uint64, size uint32, isUn
 	}
 
 	// check whether existing needle cookie matches
+	/// 检查 cookie
 	nv, ok := v.nm.Get(n.Id)
 	if ok {
 		existingNeedle, _, _, existingNeedleReadErr := needle.ReadNeedleHeader(v.DataBackend, v.Version(), nv.Offset.ToAcutalOffset())
@@ -94,6 +97,7 @@ func (v *Volume) writeNeedle(n *needle.Needle) (offset uint64, size uint32, isUn
 	}
 
 	// append to dat file
+	/// 追加到原始文件后面
 	n.AppendAtNs = uint64(time.Now().UnixNano())
 	if offset, size, _, err = n.Append(v.DataBackend, v.Version()); err != nil {
 		return
@@ -101,6 +105,7 @@ func (v *Volume) writeNeedle(n *needle.Needle) (offset uint64, size uint32, isUn
 	v.lastAppendAtNs = n.AppendAtNs
 
 	// add to needle map
+	/// 记录位置信息
 	if !ok || uint64(nv.Offset.ToAcutalOffset()) < offset {
 		if err = v.nm.Put(n.Id, ToOffset(int64(offset)), n.Size); err != nil {
 			glog.V(4).Infof("failed to save in needle map %d: %v", n.Id, err)
@@ -112,6 +117,7 @@ func (v *Volume) writeNeedle(n *needle.Needle) (offset uint64, size uint32, isUn
 	return
 }
 
+/// 删除 needle 也是以 append 的方式进行的, 只是 Data 为 nil 了
 func (v *Volume) deleteNeedle(n *needle.Needle) (uint32, error) {
 	glog.V(4).Infof("delete needle %s", needle.NewFileIdFromNeedle(v.Id, n).String())
 	v.dataFileAccessLock.Lock()
@@ -136,6 +142,7 @@ func (v *Volume) deleteNeedle(n *needle.Needle) (uint32, error) {
 }
 
 // read fills in Needle content by looking up n.Id from NeedleMapper
+/// 从 volume 中读取 needle
 func (v *Volume) readNeedle(n *needle.Needle) (int, error) {
 	v.dataFileAccessLock.RLock()
 	defer v.dataFileAccessLock.RUnlock()
@@ -177,10 +184,12 @@ type VolumeFileScanner interface {
 	VisitNeedle(n *needle.Needle, offset int64, needleHeader, needleBody []byte) error
 }
 
+/// 扫描 volume 文件
 func ScanVolumeFile(dirname string, collection string, id needle.VolumeId,
 	needleMapKind NeedleMapType,
 	volumeFileScanner VolumeFileScanner) (err error) {
 	var v *Volume
+	/// 打开 .dat 文件
 	if v, err = loadVolumeWithoutIndex(dirname, collection, id, needleMapKind); err != nil {
 		return fmt.Errorf("failed to load volume %d: %v", id, err)
 	}
@@ -198,7 +207,9 @@ func ScanVolumeFile(dirname string, collection string, id needle.VolumeId,
 	return ScanVolumeFileFrom(version, v.DataBackend, offset, volumeFileScanner)
 }
 
+/// 循环扫描 volume 中的 Needle 文件
 func ScanVolumeFileFrom(version needle.Version, datBackend backend.BackendStorageFile, offset int64, volumeFileScanner VolumeFileScanner) (err error) {
+	/// 获取头部信息 n 是 Needle 包含 Cookie Id Size 三个字段, 数据保存在 datBackend 磁盘文件中
 	n, nh, rest, e := needle.ReadNeedleHeader(datBackend, version, offset)
 	if e != nil {
 		if e == io.EOF {
@@ -208,6 +219,7 @@ func ScanVolumeFileFrom(version needle.Version, datBackend backend.BackendStorag
 	}
 	for n != nil {
 		var needleBody []byte
+		/// 把 Needle 文件的 剩余 body 读取到内存中 和 datBackend 磁盘文件中
 		if volumeFileScanner.ReadNeedleBody() {
 			if needleBody, err = n.ReadNeedleBody(datBackend, version, offset+NeedleHeaderSize, rest); err != nil {
 				glog.V(0).Infof("cannot read needle body: %v", err)
@@ -225,6 +237,7 @@ func ScanVolumeFileFrom(version needle.Version, datBackend backend.BackendStorag
 		}
 		offset += NeedleHeaderSize + rest
 		glog.V(4).Infof("==> new entry offset %d", offset)
+		/// 紧接着读取下一个 Needle 文件
 		if n, nh, rest, err = needle.ReadNeedleHeader(datBackend, version, offset); err != nil {
 			if err == io.EOF {
 				return nil

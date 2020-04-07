@@ -8,6 +8,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/storage/needle"
 )
 
+/// 检测垃圾率
 func (vs *VolumeServer) VacuumVolumeCheck(ctx context.Context, req *volume_server_pb.VacuumVolumeCheckRequest) (*volume_server_pb.VacuumVolumeCheckResponse, error) {
 
 	resp := &volume_server_pb.VacuumVolumeCheckResponse{}
@@ -24,6 +25,7 @@ func (vs *VolumeServer) VacuumVolumeCheck(ctx context.Context, req *volume_serve
 
 }
 
+/// 压缩空洞 实际是使用复制算法 进行文件腾挪  进行空洞去除  然后删除临时文件
 func (vs *VolumeServer) VacuumVolumeCompact(ctx context.Context, req *volume_server_pb.VacuumVolumeCompactRequest) (*volume_server_pb.VacuumVolumeCompactResponse, error) {
 
 	resp := &volume_server_pb.VacuumVolumeCompactResponse{}
@@ -40,6 +42,7 @@ func (vs *VolumeServer) VacuumVolumeCompact(ctx context.Context, req *volume_ser
 
 }
 
+/// 提交压缩 实际是进行 临时复制拷贝 文件的 rename
 func (vs *VolumeServer) VacuumVolumeCommit(ctx context.Context, req *volume_server_pb.VacuumVolumeCommitRequest) (*volume_server_pb.VacuumVolumeCommitResponse, error) {
 
 	resp := &volume_server_pb.VacuumVolumeCommitResponse{}
@@ -61,6 +64,7 @@ func (vs *VolumeServer) VacuumVolumeCommit(ctx context.Context, req *volume_serv
 
 }
 
+/// 删除临时拷贝文件
 func (vs *VolumeServer) VacuumVolumeCleanup(ctx context.Context, req *volume_server_pb.VacuumVolumeCleanupRequest) (*volume_server_pb.VacuumVolumeCleanupResponse, error) {
 
 	resp := &volume_server_pb.VacuumVolumeCleanupResponse{}

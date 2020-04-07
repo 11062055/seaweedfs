@@ -17,6 +17,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/util"
 )
 
+/// 获取垃圾率
 func (v *Volume) garbageLevel() float64 {
 	if v.ContentSize() == 0 {
 		return 0
@@ -34,6 +35,7 @@ func (v *Volume) garbageLevel() float64 {
 }
 
 // compact a volume based on deletions in .dat files
+/// 压缩文件 根据 .dat 文件 中的 deletions 进行压缩
 func (v *Volume) Compact(preallocate int64, compactionBytePerSecond int64) error {
 
 	if v.MemoryMapMaxSizeMb != 0 { //it makes no sense to compact in memory
@@ -59,10 +61,12 @@ func (v *Volume) Compact(preallocate int64, compactionBytePerSecond int64) error
 	if err := v.nm.Sync(); err != nil {
 		glog.V(0).Infof("compact fail to sync volume idx %d", v.Id)
 	}
+	/// 数据和索引分别拷贝到 .cpd .cpx 文件中去
 	return v.copyDataAndGenerateIndexFile(filePath+".cpd", filePath+".cpx", preallocate, compactionBytePerSecond)
 }
 
 // compact a volume based on deletions in .idx files
+/// 复制回收垃圾文件
 func (v *Volume) Compact2(preallocate int64, compactionBytePerSecond int64) error {
 
 	if v.MemoryMapMaxSizeMb != 0 { //it makes no sense to compact in memory
@@ -88,6 +92,7 @@ func (v *Volume) Compact2(preallocate int64, compactionBytePerSecond int64) erro
 	return copyDataBasedOnIndexFile(filePath+".dat", filePath+".idx", filePath+".cpd", filePath+".cpx", v.SuperBlock, v.Version(), preallocate, compactionBytePerSecond)
 }
 
+/// 提交压缩 实际进行 的是 临时 文件 的 rename
 func (v *Volume) CommitCompact() error {
 	if v.MemoryMapMaxSizeMb != 0 { //it makes no sense to compact in memory
 		return nil
@@ -135,6 +140,7 @@ func (v *Volume) CommitCompact() error {
 			}
 		}
 		var e error
+		/// rename 将新生成的临时文件 .cpd .cpx 覆盖掉老文件
 		if e = os.Rename(v.FileName()+".cpd", v.FileName()+".dat"); e != nil {
 			return fmt.Errorf("rename %s: %v", v.FileName()+".cpd", e)
 		}
@@ -146,6 +152,7 @@ func (v *Volume) CommitCompact() error {
 	//glog.V(3).Infof("Pretending to be vacuuming...")
 	//time.Sleep(20 * time.Second)
 
+	/// 删除 leveldb 文件
 	os.RemoveAll(v.FileName() + ".ldb")
 
 	glog.V(3).Infof("Loading volume %d commit file...", v.Id)
@@ -155,6 +162,7 @@ func (v *Volume) CommitCompact() error {
 	return nil
 }
 
+/// 删除临时拷贝的文件
 func (v *Volume) cleanupCompact() error {
 	glog.V(0).Infof("Cleaning up volume %d vacuuming...", v.Id)
 
@@ -329,6 +337,7 @@ func (scanner *VolumeFileScanner4Vacuum) ReadNeedleBody() bool {
 	return true
 }
 
+/// 回收 垃圾 时遍历 needle
 func (scanner *VolumeFileScanner4Vacuum) VisitNeedle(n *needle.Needle, offset int64, needleHeader, needleBody []byte) error {
 	if n.HasTtl() && scanner.now >= n.LastModified+uint64(scanner.v.Ttl.Minutes()*60) {
 		return nil
@@ -336,6 +345,7 @@ func (scanner *VolumeFileScanner4Vacuum) VisitNeedle(n *needle.Needle, offset in
 	nv, ok := scanner.v.nm.Get(n.Id)
 	glog.V(4).Infoln("needle expected offset ", offset, "ok", ok, "nv", nv)
 	if ok && nv.Offset.ToAcutalOffset() == offset && nv.Size > 0 && nv.Size != TombstoneFileSize {
+		/// 存到 比如 leveldb 中去
 		if err := scanner.nm.Set(n.Id, ToOffset(scanner.newOffset), n.Size); err != nil {
 			return fmt.Errorf("cannot put needle: %s", err)
 		}
@@ -350,15 +360,19 @@ func (scanner *VolumeFileScanner4Vacuum) VisitNeedle(n *needle.Needle, offset in
 	return nil
 }
 
+/// 拷贝 dat 文件 并且 创建 索引 文件
+/// .cpd .cpx 文件
 func (v *Volume) copyDataAndGenerateIndexFile(dstName, idxName string, preallocate int64, compactionBytePerSecond int64) (err error) {
 	var (
 		dst backend.BackendStorageFile
 	)
+	/// 创建 目标 文件 .cpd 实际是一个临时硬盘文件
 	if dst, err = createVolumeFile(dstName, preallocate, 0); err != nil {
 		return
 	}
 	defer dst.Close()
 
+	/// 实际使用的是 leveldb
 	nm := needle_map.NewMemDb()
 	defer nm.Close()
 
@@ -369,15 +383,19 @@ func (v *Volume) copyDataAndGenerateIndexFile(dstName, idxName string, prealloca
 		dstBackend:     dst,
 		writeThrottler: util.NewWriteThrottler(compactionBytePerSecond),
 	}
+	/// 扫描 文件 把 相应 索引信息 存储在 leveldb 中 Set(key NeedleId, offset Offset, size uint32)
+	/// 数据存到 .cpd dst文件 中去
 	err = ScanVolumeFile(v.dir, v.Collection, v.Id, v.needleMapKind, scanner)
 	if err != nil {
 		return nil
 	}
 
+	/// 将 leveldb 中的索引信息 存到临时磁盘文件 .cpx 中去
 	err = nm.SaveToIdx(idxName)
 	return
 }
 
+/// 基于 index file 拷贝数据, 索引文件 先 读取到 新旧 leveldb 中, 然后再将 旧的 数据文件 拷贝到新的 数据文件中去
 func copyDataBasedOnIndexFile(srcDatName, srcIdxName, dstDatName, datIdxName string, sb super_block.SuperBlock, version needle.Version, preallocate int64, compactionBytePerSecond int64) (err error) {
 	var (
 		srcDatBackend, dstDatBackend backend.BackendStorageFile
@@ -388,6 +406,7 @@ func copyDataBasedOnIndexFile(srcDatName, srcIdxName, dstDatName, datIdxName str
 	}
 	defer dstDatBackend.Close()
 
+	/// 两个 leveldb 用于存 新 旧 索引文件
 	oldNm := needle_map.NewMemDb()
 	defer oldNm.Close()
 	newNm := needle_map.NewMemDb()
@@ -427,9 +446,11 @@ func copyDataBasedOnIndexFile(srcDatName, srcIdxName, dstDatName, datIdxName str
 			return nil
 		}
 
+		/// 将没有过期的 索引 数据 存储在 新的 leveldb 中
 		if err = newNm.Set(n.Id, ToOffset(newOffset), n.Size); err != nil {
 			return fmt.Errorf("cannot put needle: %s", err)
 		}
+		/// 数据也拷贝到新的备份 文件中去
 		if _, _, _, err = n.Append(dstDatBackend, sb.Version); err != nil {
 			return fmt.Errorf("cannot append needle: %s", err)
 		}

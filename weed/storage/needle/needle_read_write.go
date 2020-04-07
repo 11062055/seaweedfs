@@ -301,11 +301,13 @@ func NeedleBodyLength(needleSize uint32, version Version) int64 {
 
 //n should be a needle already read the header
 //the input stream will read until next file entry
+/// 将 body 数据 全部读取到 内存中
 func (n *Needle) ReadNeedleBody(r backend.BackendStorageFile, version Version, offset int64, bodyLength int64) (bytes []byte, err error) {
 
 	if bodyLength <= 0 {
 		return nil, nil
 	}
+	/// 申请 相应 长度的内存 用于存储包体
 	bytes = make([]byte, bodyLength)
 	if _, err = r.ReadAt(bytes, offset); err != nil {
 		return

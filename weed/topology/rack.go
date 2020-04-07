@@ -10,6 +10,7 @@ type Rack struct {
 	NodeImpl
 }
 
+/// data center -> rack -> data node
 func NewRack(id string) *Rack {
 	r := &Rack{}
 	r.id = NodeId(id)
@@ -28,6 +29,8 @@ func (r *Rack) FindDataNode(ip string, port int) *DataNode {
 	}
 	return nil
 }
+
+/// 获取或者创建一个 data node
 func (r *Rack) GetOrCreateDataNode(ip string, port int, publicUrl string, maxVolumeCount int64) *DataNode {
 	for _, c := range r.Children() {
 		dn := c.(*DataNode)
@@ -42,10 +45,12 @@ func (r *Rack) GetOrCreateDataNode(ip string, port int, publicUrl string, maxVol
 	dn.PublicUrl = publicUrl
 	dn.maxVolumeCount = maxVolumeCount
 	dn.LastSeen = time.Now().Unix()
+	/// 加入child列表, 并且设置父子关系
 	r.LinkChildNode(dn)
 	return dn
 }
 
+/// 获取机架的信息
 func (r *Rack) ToMap() interface{} {
 	m := make(map[string]interface{})
 	m["Id"] = r.Id()
@@ -60,6 +65,7 @@ func (r *Rack) ToMap() interface{} {
 	return m
 }
 
+/// 获取 rack 信息, 会调用 data node 的 ToDataNodeInfo
 func (r *Rack) ToRackInfo() *master_pb.RackInfo {
 	m := &master_pb.RackInfo{
 		Id:                string(r.Id()),

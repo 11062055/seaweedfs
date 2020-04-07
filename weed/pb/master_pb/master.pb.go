@@ -67,6 +67,7 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
+/// 传递 心跳包 的 相关数据结构体
 type Heartbeat struct {
 	Ip             string                      `protobuf:"bytes,1,opt,name=ip" json:"ip,omitempty"`
 	Port           uint32                      `protobuf:"varint,2,opt,name=port" json:"port,omitempty"`
@@ -254,6 +255,7 @@ func (m *HeartbeatResponse) GetStorageBackends() []*StorageBackend {
 	return nil
 }
 
+/// 传递 volume info 的相关数据接口
 type VolumeInformationMessage struct {
 	Id                uint32 `protobuf:"varint,1,opt,name=id" json:"id,omitempty"`
 	Size              uint64 `protobuf:"varint,2,opt,name=size" json:"size,omitempty"`
@@ -374,6 +376,7 @@ func (m *VolumeInformationMessage) GetRemoteStorageKey() string {
 	return ""
 }
 
+/// 传递 volume short info 的相关结构体
 type VolumeShortInformationMessage struct {
 	Id               uint32 `protobuf:"varint,1,opt,name=id" json:"id,omitempty"`
 	Collection       string `protobuf:"bytes,3,opt,name=collection" json:"collection,omitempty"`
@@ -422,6 +425,7 @@ func (m *VolumeShortInformationMessage) GetTtl() uint32 {
 	return 0
 }
 
+/// 传递 volume ec shard info 的相关结构体
 type VolumeEcShardInformationMessage struct {
 	Id          uint32 `protobuf:"varint,1,opt,name=id" json:"id,omitempty"`
 	Collection  string `protobuf:"bytes,2,opt,name=collection" json:"collection,omitempty"`
@@ -456,6 +460,7 @@ func (m *VolumeEcShardInformationMessage) GetEcIndexBits() uint32 {
 	return 0
 }
 
+/// storage backend 相关结构体
 type StorageBackend struct {
 	Type       string            `protobuf:"bytes,1,opt,name=type" json:"type,omitempty"`
 	Id         string            `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
@@ -570,6 +575,7 @@ func (m *KeepConnectedRequest) GetGrpcPort() uint32 {
 	return 0
 }
 
+/// 传递 volume location 的 相关结构体
 type VolumeLocation struct {
 	Url         string   `protobuf:"bytes,1,opt,name=url" json:"url,omitempty"`
 	PublicUrl   string   `protobuf:"bytes,2,opt,name=public_url,json=publicUrl" json:"public_url,omitempty"`
@@ -1047,6 +1053,7 @@ func (*CollectionDeleteResponse) Descriptor() ([]byte, []int) { return fileDescr
 //
 // volume related
 //
+/// 传递 data node 信息 的 相关 结构体
 type DataNodeInfo struct {
 	Id                string                             `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	VolumeCount       uint64                             `protobuf:"varint,2,opt,name=volume_count,json=volumeCount" json:"volume_count,omitempty"`
@@ -1119,6 +1126,7 @@ func (m *DataNodeInfo) GetRemoteVolumeCount() uint64 {
 	return 0
 }
 
+/// 传递 rack info 信息 的 相关 结构体
 type RackInfo struct {
 	Id                string          `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	VolumeCount       uint64          `protobuf:"varint,2,opt,name=volume_count,json=volumeCount" json:"volume_count,omitempty"`
@@ -1183,6 +1191,7 @@ func (m *RackInfo) GetRemoteVolumeCount() uint64 {
 	return 0
 }
 
+/// 传递 data center 信息 的 相关 结构体
 type DataCenterInfo struct {
 	Id                string      `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	VolumeCount       uint64      `protobuf:"varint,2,opt,name=volume_count,json=volumeCount" json:"volume_count,omitempty"`
@@ -1247,6 +1256,7 @@ func (m *DataCenterInfo) GetRemoteVolumeCount() uint64 {
 	return 0
 }
 
+/// 传递 topology 信息 的 相关 结构体
 type TopologyInfo struct {
 	Id                string            `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	VolumeCount       uint64            `protobuf:"varint,2,opt,name=volume_count,json=volumeCount" json:"volume_count,omitempty"`
@@ -1477,6 +1487,7 @@ func (m *ListMasterClientsResponse) GetGrpcAddresses() []string {
 	return nil
 }
 
+/// protobuffer 相关的 通信结构注册
 func init() {
 	proto.RegisterType((*Heartbeat)(nil), "master_pb.Heartbeat")
 	proto.RegisterType((*HeartbeatResponse)(nil), "master_pb.HeartbeatResponse")
@@ -1528,6 +1539,7 @@ const _ = grpc.SupportPackageIsVersion4
 
 // Client API for Seaweed service
 
+/// master 之间通信有这些 protobuffer 接口, 每种接口对应 一种 client, 与下文 的 SeaweedServer 对应
 type SeaweedClient interface {
 	SendHeartbeat(ctx context.Context, opts ...grpc.CallOption) (Seaweed_SendHeartbeatClient, error)
 	KeepConnected(ctx context.Context, opts ...grpc.CallOption) (Seaweed_KeepConnectedClient, error)
@@ -1565,6 +1577,7 @@ type Seaweed_SendHeartbeatClient interface {
 	grpc.ClientStream
 }
 
+/// seaweedSendHeartbeatClient
 type seaweedSendHeartbeatClient struct {
 	grpc.ClientStream
 }
@@ -1581,6 +1594,7 @@ func (x *seaweedSendHeartbeatClient) Recv() (*HeartbeatResponse, error) {
 	return m, nil
 }
 
+/// 生成一个 seaweedKeepConnectedClient
 func (c *seaweedClient) KeepConnected(ctx context.Context, opts ...grpc.CallOption) (Seaweed_KeepConnectedClient, error) {
 	stream, err := grpc.NewClientStream(ctx, &_Seaweed_serviceDesc.Streams[1], c.cc, "/master_pb.Seaweed/KeepConnected", opts...)
 	if err != nil {
@@ -1695,6 +1709,7 @@ func (c *seaweedClient) ListMasterClients(ctx context.Context, in *ListMasterCli
 
 // Server API for Seaweed service
 
+/// master 之间通信有这些 protobuffer 接口, 每种接口对应 一种 client, 与上文 的 SeaweedClient 对应
 type SeaweedServer interface {
 	SendHeartbeat(Seaweed_SendHeartbeatServer) error
 	KeepConnected(Seaweed_KeepConnectedServer) error
@@ -1709,6 +1724,7 @@ type SeaweedServer interface {
 	ListMasterClients(context.Context, *ListMasterClientsRequest) (*ListMasterClientsResponse, error)
 }
 
+/// 注册 grpc server 实际注册的是 MasterServer
 func RegisterSeaweedServer(s *grpc.Server, srv SeaweedServer) {
 	s.RegisterService(&_Seaweed_serviceDesc, srv)
 }
@@ -1739,6 +1755,7 @@ func (x *seaweedSendHeartbeatServer) Recv() (*Heartbeat, error) {
 	return m, nil
 }
 
+/// 实际调用的是 MasterServer 的 KeepConnected
 func _Seaweed_KeepConnected_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(SeaweedServer).KeepConnected(&seaweedKeepConnectedServer{stream})
 }
@@ -1765,6 +1782,7 @@ func (x *seaweedKeepConnectedServer) Recv() (*KeepConnectedRequest, error) {
 	return m, nil
 }
 
+/// 实际调用的是 MasterServer 的 LookupVolume , 其中 leader master 才响应该请求
 func _Seaweed_LookupVolume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(LookupVolumeRequest)
 	if err := dec(in); err != nil {
@@ -1783,6 +1801,7 @@ func _Seaweed_LookupVolume_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+/// 实际调用的是 MasterServer 的 Assign , 其中 leader master 才响应该请求
 func _Seaweed_Assign_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AssignRequest)
 	if err := dec(in); err != nil {
@@ -1801,6 +1820,7 @@ func _Seaweed_Assign_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
+/// 实际调用的是 MasterServer 的 Statistics , 其中 leader master 才响应该请求
 func _Seaweed_Statistics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StatisticsRequest)
 	if err := dec(in); err != nil {
@@ -1819,6 +1839,7 @@ func _Seaweed_Statistics_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+/// 实际调用的是 MasterServer 的 CollectionList , 其中 leader master 才响应该请求
 func _Seaweed_CollectionList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CollectionListRequest)
 	if err := dec(in); err != nil {
@@ -1837,6 +1858,7 @@ func _Seaweed_CollectionList_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+/// 实际调用的是 MasterServer 的 CollectionDelete , 其中 leader master 才响应该请求
 func _Seaweed_CollectionDelete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CollectionDeleteRequest)
 	if err := dec(in); err != nil {
@@ -1855,6 +1877,7 @@ func _Seaweed_CollectionDelete_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+/// 实际调用的是 MasterServer 的 VolumeList 方法 , 其中 leader master 才响应该请求
 func _Seaweed_VolumeList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(VolumeListRequest)
 	if err := dec(in); err != nil {
@@ -1873,6 +1896,7 @@ func _Seaweed_VolumeList_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+/// 获取 ec volume, 实际调用的是 MasterServer 的 LookupEcVolume, 只有 leader master 才执行
 func _Seaweed_LookupEcVolume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(LookupEcVolumeRequest)
 	if err := dec(in); err != nil {
@@ -1891,6 +1915,7 @@ func _Seaweed_LookupEcVolume_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+/// 调用 的是 MasterServer 的 GetMasterConfiguration, 返回的是 GetMasterConfigurationResponse 只包含 metrics 的 地址
 func _Seaweed_GetMasterConfiguration_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetMasterConfigurationRequest)
 	if err := dec(in); err != nil {
@@ -1926,7 +1951,7 @@ func _Seaweed_ListMasterClients_Handler(srv interface{}, ctx context.Context, de
 	}
 	return interceptor(ctx, in, info, handler)
 }
-
+/// 这个地方 保存了 rpc 方法
 var _Seaweed_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "master_pb.Seaweed",
 	HandlerType: (*SeaweedServer)(nil),

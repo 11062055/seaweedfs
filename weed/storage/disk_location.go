@@ -12,6 +12,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/storage/needle"
 )
 
+/// 一个目录下有很多 volume
 type DiskLocation struct {
 	Directory      string
 	MaxVolumeCount int
@@ -30,6 +31,7 @@ func NewDiskLocation(dir string, maxVolumeCount int) *DiskLocation {
 	return location
 }
 
+/// 形如 collection_volume.idx
 func (l *DiskLocation) volumeIdFromPath(dir os.FileInfo) (needle.VolumeId, string, error) {
 	name := dir.Name()
 	if !dir.IsDir() && strings.HasSuffix(name, ".idx") {
@@ -41,6 +43,7 @@ func (l *DiskLocation) volumeIdFromPath(dir os.FileInfo) (needle.VolumeId, strin
 	return 0, "", fmt.Errorf("Path is not a volume: %s", name)
 }
 
+/// 形如 collection_volume
 func parseCollectionVolumeId(base string) (collection string, vid needle.VolumeId, err error) {
 	i := strings.LastIndex(base, "_")
 	if i > 0 {
@@ -50,6 +53,7 @@ func parseCollectionVolumeId(base string) (collection string, vid needle.VolumeI
 	return collection, vol, err
 }
 
+/// load 获取生成 一个 volume
 func (l *DiskLocation) loadExistingVolume(fileInfo os.FileInfo, needleMapKind NeedleMapType) bool {
 	name := fileInfo.Name()
 	if !fileInfo.IsDir() && strings.HasSuffix(name, ".idx") {
@@ -85,6 +89,7 @@ func (l *DiskLocation) loadExistingVolume(fileInfo os.FileInfo, needleMapKind Ne
 	return false
 }
 
+/// 并行 读取 目录 和 子目录
 func (l *DiskLocation) concurrentLoadingVolumes(needleMapKind NeedleMapType, concurrency int) {
 
 	task_queue := make(chan os.FileInfo, 10*concurrency)
@@ -121,13 +126,16 @@ func (l *DiskLocation) loadExistingVolumes(needleMapKind NeedleMapType) {
 
 }
 
+/// 从 硬盘 中删除 collection
 func (l *DiskLocation) DeleteCollectionFromDiskLocation(collection string) (e error) {
 
 	l.volumesLock.Lock()
+	/// 收集哪些 volume 需要 被 删除 除了正在compacting的
 	delVolsMap := l.unmountVolumeByCollection(collection)
 	l.volumesLock.Unlock()
 
 	l.ecVolumesLock.Lock()
+	/// 收集哪些 ec volume 需要 被 删除 除了正在compacting的
 	delEcVolsMap := l.unmountEcVolumeByCollection(collection)
 	l.ecVolumesLock.Unlock()
 
@@ -136,6 +144,7 @@ func (l *DiskLocation) DeleteCollectionFromDiskLocation(collection string) (e er
 	wg.Add(2)
 	go func() {
 		for _, v := range delVolsMap {
+			/// 调用 volume 的 Destroy 直接从硬盘中删除 volume 相关数据
 			if err := v.Destroy(); err != nil {
 				errChain <- err
 			}
@@ -145,6 +154,7 @@ func (l *DiskLocation) DeleteCollectionFromDiskLocation(collection string) (e er
 
 	go func() {
 		for _, v := range delEcVolsMap {
+			/// 调用 EcVolume 的 Destroy(), 其中会递归调用 EcVolumeShard 的 Destroy 方法
 			v.Destroy()
 		}
 		wg.Done()
@@ -181,7 +191,9 @@ func (l *DiskLocation) deleteVolumeById(vid needle.VolumeId) (e error) {
 }
 
 func (l *DiskLocation) LoadVolume(vid needle.VolumeId, needleMapKind NeedleMapType) bool {
+	/// 读取卷信息
 	if fileInfo, found := l.LocateVolume(vid); found {
+		/// 递归加载卷
 		return l.loadExistingVolume(fileInfo, needleMapKind)
 	}
 	return false
@@ -211,6 +223,7 @@ func (l *DiskLocation) UnloadVolume(vid needle.VolumeId) error {
 	return nil
 }
 
+/// 收集哪些 volume 需要 被 解挂
 func (l *DiskLocation) unmountVolumeByCollection(collectionName string) map[needle.VolumeId]*Volume {
 	deltaVols := make(map[needle.VolumeId]*Volume, 0)
 	for k, v := range l.volumes {
@@ -263,6 +276,7 @@ func (l *DiskLocation) Close() {
 	return
 }
 
+/// 读取卷信息
 func (l *DiskLocation) LocateVolume(vid needle.VolumeId) (os.FileInfo, bool) {
 	if fileInfos, err := ioutil.ReadDir(l.Directory); err == nil {
 		for _, fileInfo := range fileInfos {

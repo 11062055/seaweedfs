@@ -61,6 +61,7 @@ func (cm *MemDb) Get(key NeedleId) (*NeedleValue, bool) {
 }
 
 // Visit visits all entries or stop if any error when visiting
+/// 将 leveldb 中存储的数据遍历出来 写入到文件中去
 func (cm *MemDb) AscendingVisit(visit func(NeedleValue) error) (ret error) {
 	iter := cm.db.NewIterator(nil, nil)
 	for iter.Next() {
@@ -88,6 +89,7 @@ func (cm *MemDb) SaveToIdx(idxName string) (ret error) {
 	}
 	defer idxFile.Close()
 
+	/// 将 leveldb 中存储的数据遍历出来 写入到 idx 文件中去
 	return cm.AscendingVisit(func(value NeedleValue) error {
 		if value.Offset.IsZero() || value.Size == TombstoneFileSize {
 			return nil

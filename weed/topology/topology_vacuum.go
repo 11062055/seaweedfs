@@ -14,6 +14,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/pb/volume_server_pb"
 )
 
+/// 根据指定 垃圾 率 查看是否需要 清除文件空洞 调用 volume server 的 VacuumVolumeCheck 获取 GarbageRatio
 func batchVacuumVolumeCheck(grpcDialOption grpc.DialOption, vl *VolumeLayout, vid needle.VolumeId,
 	locationlist *VolumeLocationList, garbageThreshold float64) (*VolumeLocationList, bool) {
 	ch := make(chan int, locationlist.Length())
@@ -29,6 +30,7 @@ func batchVacuumVolumeCheck(grpcDialOption grpc.DialOption, vl *VolumeLayout, vi
 					ch <- -1
 					return err
 				}
+				/// 有垃圾待收集
 				if resp.GarbageRatio >= garbageThreshold {
 					ch <- index
 				} else {
@@ -54,6 +56,8 @@ func batchVacuumVolumeCheck(grpcDialOption grpc.DialOption, vl *VolumeLayout, vi
 	}
 	return vacuumLocationList, errCount == 0 && len(vacuumLocationList.list) > 0
 }
+
+/// 压实文件空洞 pb 调用的是 volume server 的 VacuumVolumeCompact
 func batchVacuumVolumeCompact(grpcDialOption grpc.DialOption, vl *VolumeLayout, vid needle.VolumeId,
 	locationlist *VolumeLocationList, preallocate int64) bool {
 	vl.accessLock.Lock()
@@ -136,6 +140,7 @@ func batchVacuumVolumeCleanup(grpcDialOption grpc.DialOption, vl *VolumeLayout, 
 	}
 }
 
+/// 清除文件空洞,
 func (t *Topology) Vacuum(grpcDialOption grpc.DialOption, garbageThreshold float64, preallocate int64) int {
 
 	// if there is vacuum going on, return immediately
@@ -160,6 +165,7 @@ func (t *Topology) Vacuum(grpcDialOption grpc.DialOption, garbageThreshold float
 	return 0
 }
 
+/// 清除文件空洞
 func vacuumOneVolumeLayout(grpcDialOption grpc.DialOption, volumeLayout *VolumeLayout, c *Collection, garbageThreshold float64, preallocate int64) {
 
 	volumeLayout.accessLock.RLock()

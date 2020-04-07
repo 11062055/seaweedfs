@@ -77,6 +77,7 @@ func parsePut(r *http.Request, sizeLimit int64, pu *ParsedUpload) (e error) {
 	return nil
 }
 
+/// 从 http 请求中 读取 数据
 func parseMultipart(r *http.Request, sizeLimit int64, pu *ParsedUpload) (e error) {
 	defer func() {
 		if e != nil && r.Body != nil {

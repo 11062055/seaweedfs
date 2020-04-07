@@ -57,6 +57,7 @@ func main() {
 		return
 	}
 
+	/// 根据输入命令找到需要执行那个模块, 形如 ./weed master ./weed volume
 	for _, cmd := range commands {
 		if cmd.Name() == args[0] && cmd.Run != nil {
 			cmd.Flag.Usage = func() { cmd.Usage() }

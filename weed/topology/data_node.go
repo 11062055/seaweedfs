@@ -13,6 +13,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/storage"
 )
 
+/// data center -> rack -> data node
 type DataNode struct {
 	NodeImpl
 	volumes      map[needle.VolumeId]storage.VolumeInfo
@@ -40,6 +41,7 @@ func (dn *DataNode) String() string {
 	return fmt.Sprintf("Node:%s, volumes:%v, Ip:%s, Port:%d, PublicUrl:%s", dn.NodeImpl.String(), dn.volumes, dn.Ip, dn.Port, dn.PublicUrl)
 }
 
+/// 增加 或者 更新 卷, 并且同时修改 某些 count 参数
 func (dn *DataNode) AddOrUpdateVolume(v storage.VolumeInfo) (isNew bool) {
 	dn.Lock()
 	defer dn.Unlock()
@@ -68,6 +70,7 @@ func (dn *DataNode) AddOrUpdateVolume(v storage.VolumeInfo) (isNew bool) {
 	return
 }
 
+/// 更新 data node 节点 的 volume 信息, 返回哪些是新增的 哪些是删除了的
 func (dn *DataNode) UpdateVolumes(actualVolumes []storage.VolumeInfo) (newVolumes, deletedVolumes []storage.VolumeInfo) {
 	actualVolumeMap := make(map[needle.VolumeId]storage.VolumeInfo)
 	for _, v := range actualVolumes {
@@ -98,6 +101,7 @@ func (dn *DataNode) UpdateVolumes(actualVolumes []storage.VolumeInfo) (newVolume
 	return
 }
 
+/// 更新 或 删除 节点上的 volume 信息
 func (dn *DataNode) DeltaUpdateVolumes(newlVolumes, deletedVolumes []storage.VolumeInfo) {
 	dn.Lock()
 	for _, v := range deletedVolumes {
@@ -126,6 +130,7 @@ func (dn *DataNode) GetVolumes() (ret []storage.VolumeInfo) {
 	return ret
 }
 
+/// 根据 volume id 获取 volume info 信息, 逆向索引
 func (dn *DataNode) GetVolumesById(id needle.VolumeId) (storage.VolumeInfo, error) {
 	dn.RLock()
 	defer dn.RUnlock()
@@ -162,6 +167,7 @@ func (dn *DataNode) Url() string {
 	return dn.Ip + ":" + strconv.Itoa(dn.Port)
 }
 
+/// 获取机器节点的信息
 func (dn *DataNode) ToMap() interface{} {
 	ret := make(map[string]interface{})
 	ret["Url"] = dn.Url()

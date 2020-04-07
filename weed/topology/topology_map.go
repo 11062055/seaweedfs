@@ -2,6 +2,7 @@ package topology
 
 import "github.com/chrislusf/seaweedfs/weed/pb/master_pb"
 
+/// uiStatusHandler中调用该方法获取拓扑信息
 func (t *Topology) ToMap() interface{} {
 	m := make(map[string]interface{})
 	m["Max"] = t.GetMaxVolumeCount()
@@ -9,6 +10,7 @@ func (t *Topology) ToMap() interface{} {
 	var dcs []interface{}
 	for _, c := range t.Children() {
 		dc := c.(*DataCenter)
+		/// 递归调用 数据中心 机架 节点 的 ToMap 方法获取所有信息
 		dcs = append(dcs, dc.ToMap())
 	}
 	m["DataCenters"] = dcs
@@ -54,6 +56,7 @@ func (t *Topology) ToVolumeMap() interface{} {
 	return m
 }
 
+/// 获取 volume 信息 和 ec shard 信息
 func (t *Topology) ToVolumeLocations() (volumeLocations []*master_pb.VolumeLocation) {
 	for _, c := range t.Children() {
 		dc := c.(*DataCenter)
@@ -78,6 +81,7 @@ func (t *Topology) ToVolumeLocations() (volumeLocations []*master_pb.VolumeLocat
 	return
 }
 
+/// 获取 拓扑 信息, 会调用 data center 的 ToDataCenterInfo, 其中递归调用 rack 和 data node 的相关方法获取整个 拓扑的信息
 func (t *Topology) ToTopologyInfo() *master_pb.TopologyInfo {
 	m := &master_pb.TopologyInfo{
 		Id:                string(t.Id()),

@@ -13,6 +13,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/glog"
 )
 
+/// 获取 grpc server 的相关证书
 func LoadServerTLS(config *viper.Viper, component string) grpc.ServerOption {
 	if config == nil {
 		return nil
@@ -40,6 +41,7 @@ func LoadServerTLS(config *viper.Viper, component string) grpc.ServerOption {
 	return grpc.Creds(ta)
 }
 
+/// 获取 grpc client 的相关证书
 func LoadClientTLS(config *viper.Viper, component string) grpc.DialOption {
 	if config == nil {
 		return grpc.WithInsecure()

@@ -15,6 +15,7 @@ func (s *RaftServer) StatusHandler(w http.ResponseWriter, r *http.Request) {
 		IsLeader: s.topo.IsLeader(),
 		Peers:    s.Peers(),
 	}
+	/// topo 获取 leader 的方式 是 从 raft 中获取
 	if leader, e := s.topo.Leader(); e == nil {
 		ret.Leader = leader
 	}

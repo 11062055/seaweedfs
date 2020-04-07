@@ -9,11 +9,13 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/storage"
 )
 
+/// 收集 dead node 和 满 volume, 进行 空洞 压缩, 只有 leader 才执行
 func (t *Topology) StartRefreshWritableVolumes(grpcDialOption grpc.DialOption, garbageThreshold float64, preallocate int64) {
 	go func() {
 		for {
 			if t.IsLeader() {
 				freshThreshHold := time.Now().Unix() - 3*t.pulse //3 times of sleep interval
+				/// 会遍历本地所有 data node, 如果 该节点 已满, 则将节点 写入 chanFullVolumes, 会在 下面 SetVolumeCapacityFull 中处理
 				t.CollectDeadNodeAndFullVolumes(freshThreshHold, t.volumeSizeLimit)
 			}
 			time.Sleep(time.Duration(float32(t.pulse*1e3)*(1+rand.Float32())) * time.Millisecond)
@@ -23,6 +25,7 @@ func (t *Topology) StartRefreshWritableVolumes(grpcDialOption grpc.DialOption, g
 		c := time.Tick(15 * time.Minute)
 		for _ = range c {
 			if t.IsLeader() {
+				/// 会调用 各个 volume server 进行 空洞 的 整理, 采用 复制算法, 新建临时文件, 将还在用的 volume 腾挪到临时文件
 				t.Vacuum(grpcDialOption, garbageThreshold, preallocate)
 			}
 		}
@@ -31,11 +34,14 @@ func (t *Topology) StartRefreshWritableVolumes(grpcDialOption grpc.DialOption, g
 		for {
 			select {
 			case v := <-t.chanFullVolumes:
+				/// 将 volume 从 volume layout 的可写文件列表中删除
 				t.SetVolumeCapacityFull(v)
 			}
 		}
 	}()
 }
+
+/// 实际是将 一个 volume 从 Layout 的 writable 列表中删除
 func (t *Topology) SetVolumeCapacityFull(volumeInfo storage.VolumeInfo) bool {
 	vl := t.GetVolumeLayout(volumeInfo.Collection, volumeInfo.ReplicaPlacement, volumeInfo.Ttl)
 	if !vl.SetVolumeCapacityFull(volumeInfo.Id) {
@@ -52,6 +58,8 @@ func (t *Topology) SetVolumeCapacityFull(volumeInfo storage.VolumeInfo) bool {
 	}
 	return true
 }
+
+/// 从 VolumeLocationList 中 remove, 再从 VolumeLayout 的 可写列表中删除
 func (t *Topology) UnRegisterDataNode(dn *DataNode) {
 	for _, v := range dn.GetVolumes() {
 		glog.V(0).Infoln("Removing Volume", v.Id, "from the dead volume server", dn.Id())

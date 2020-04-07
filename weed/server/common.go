@@ -92,6 +92,8 @@ func debug(params ...interface{}) {
 	glog.V(4).Infoln(params...)
 }
 
+/// 读取请求数据, 分配 volume 和 file id 等资源, 然后上传文件
+/// master 收到 submit 请求后代为传输 到 volume server 时, 在 submitFromMasterServerHandler 中触发调用
 func submitForClientHandler(w http.ResponseWriter, r *http.Request, masterUrl string, grpcDialOption grpc.DialOption) {
 	m := make(map[string]interface{})
 	if r.Method != "POST" {
@@ -100,6 +102,7 @@ func submitForClientHandler(w http.ResponseWriter, r *http.Request, masterUrl st
 	}
 
 	debug("parsing upload file...")
+	/// 读取数据
 	pu, pe := needle.ParseUpload(r, 256*1024*1024)
 	if pe != nil {
 		writeJsonError(w, r, http.StatusBadRequest, pe)
@@ -123,6 +126,7 @@ func submitForClientHandler(w http.ResponseWriter, r *http.Request, masterUrl st
 		Collection:  r.FormValue("collection"),
 		Ttl:         r.FormValue("ttl"),
 	}
+	/// 分配资源节点
 	assignResult, ae := operation.Assign(masterUrl, grpcDialOption, ar)
 	if ae != nil {
 		writeJsonError(w, r, http.StatusInternalServerError, ae)
@@ -135,6 +139,7 @@ func submitForClientHandler(w http.ResponseWriter, r *http.Request, masterUrl st
 	}
 
 	debug("upload file to store", url)
+	/// 传输文件到指定位置
 	uploadResult, err := operation.UploadData(url, pu.FileName, false, pu.Data, pu.IsGzipped, pu.MimeType, pu.PairMap, assignResult.Auth)
 	if err != nil {
 		writeJsonError(w, r, http.StatusInternalServerError, err)

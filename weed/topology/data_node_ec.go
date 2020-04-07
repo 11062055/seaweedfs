@@ -62,6 +62,7 @@ func (dn *DataNode) UpdateEcShards(actualShards []*erasure_coding.EcVolumeInfo) 
 	return
 }
 
+/// data node 要记录到 shard 的反向索引信息
 func (dn *DataNode) DeltaUpdateEcShards(newShards, deletedShards []*erasure_coding.EcVolumeInfo) {
 
 	for _, newShard := range newShards {
@@ -74,6 +75,7 @@ func (dn *DataNode) DeltaUpdateEcShards(newShards, deletedShards []*erasure_codi
 
 }
 
+/// data node 中增加 或者 更新 ec shard 信息
 func (dn *DataNode) AddOrUpdateEcShard(s *erasure_coding.EcVolumeInfo) {
 	dn.ecShardsLock.Lock()
 	defer dn.ecShardsLock.Unlock()

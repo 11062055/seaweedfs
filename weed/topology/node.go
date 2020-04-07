@@ -61,6 +61,7 @@ type NodeImpl struct {
 	value    interface{}
 }
 
+/// 随机选择 有空闲 空间 的 node, 可能是 rack, data center, topology
 // the first node must satisfy filterFirstNodeFn(), the rest nodes must have one free slot
 func (n *NodeImpl) PickNodesByWeight(numberOfNodes int, filterFirstNodeFn func(dn Node) error) (firstNode Node, restNodes []Node, err error) {
 	var totalWeights int64
@@ -191,55 +192,72 @@ func (n *NodeImpl) ReserveOneVolume(r int64) (assignedNode *DataNode, err error)
 	return nil, errors.New("No free volume slot found!")
 }
 
+/// 增加 volume 数目
 func (n *NodeImpl) UpAdjustMaxVolumeCountDelta(maxVolumeCountDelta int64) { //can be negative
 	if maxVolumeCountDelta == 0 {
 		return
 	}
 	atomic.AddInt64(&n.maxVolumeCount, maxVolumeCountDelta)
+	/// 同时 增加 parent 的 volume 数目
 	if n.parent != nil {
 		n.parent.UpAdjustMaxVolumeCountDelta(maxVolumeCountDelta)
 	}
 }
+
+/// 增加 volume count
 func (n *NodeImpl) UpAdjustVolumeCountDelta(volumeCountDelta int64) { //can be negative
 	if volumeCountDelta == 0 {
 		return
 	}
 	atomic.AddInt64(&n.volumeCount, volumeCountDelta)
 	if n.parent != nil {
+		/// 同时调整 parent 的 volume count
 		n.parent.UpAdjustVolumeCountDelta(volumeCountDelta)
 	}
 }
+
+/// 增加 remote volume count
 func (n *NodeImpl) UpAdjustRemoteVolumeCountDelta(remoteVolumeCountDelta int64) { //can be negative
 	if remoteVolumeCountDelta == 0 {
 		return
 	}
 	atomic.AddInt64(&n.remoteVolumeCount, remoteVolumeCountDelta)
 	if n.parent != nil {
+		/// 增加 parent 的 remote volume count
 		n.parent.UpAdjustRemoteVolumeCountDelta(remoteVolumeCountDelta)
 	}
 }
+
+/// 增加 ec shard count
 func (n *NodeImpl) UpAdjustEcShardCountDelta(ecShardCountDelta int64) { //can be negative
 	if ecShardCountDelta == 0 {
 		return
 	}
 	atomic.AddInt64(&n.ecShardCount, ecShardCountDelta)
 	if n.parent != nil {
+		/// 同时 增加 parent 的 ec shard count
 		n.parent.UpAdjustEcShardCountDelta(ecShardCountDelta)
 	}
 }
+
+/// 增加 active volume count
 func (n *NodeImpl) UpAdjustActiveVolumeCountDelta(activeVolumeCountDelta int64) { //can be negative
 	if activeVolumeCountDelta == 0 {
 		return
 	}
 	atomic.AddInt64(&n.activeVolumeCount, activeVolumeCountDelta)
 	if n.parent != nil {
+		/// 增加 parent 的 active volume count
 		n.parent.UpAdjustActiveVolumeCountDelta(activeVolumeCountDelta)
 	}
 }
+
+/// 设置 最大 volume id
 func (n *NodeImpl) UpAdjustMaxVolumeId(vid needle.VolumeId) { //can be negative
 	if n.maxVolumeId < vid {
 		n.maxVolumeId = vid
 		if n.parent != nil {
+			/// 同时调整 parent 的 max volume id
 			n.parent.UpAdjustMaxVolumeId(vid)
 		}
 	}
@@ -263,6 +281,7 @@ func (n *NodeImpl) GetMaxVolumeCount() int64 {
 	return n.maxVolumeCount
 }
 
+/// 加入一个 child node 并设置 父子关系
 func (n *NodeImpl) LinkChildNode(node Node) {
 	n.Lock()
 	defer n.Unlock()
@@ -295,6 +314,7 @@ func (n *NodeImpl) UnlinkChildNode(nodeId NodeId) {
 	}
 }
 
+/// 收集空间满了的 节点, 在 StartRefreshWritableVolumes 中调用, 异步处理节点
 func (n *NodeImpl) CollectDeadNodeAndFullVolumes(freshThreshHold int64, volumeSizeLimit uint64) {
 	if n.IsRack() {
 		for _, c := range n.Children() {

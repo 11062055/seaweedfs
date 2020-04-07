@@ -12,10 +12,13 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/storage/super_block"
 )
 
+/// 响应 leader master 的 DeleteCollection 请求
 func (vs *VolumeServer) DeleteCollection(ctx context.Context, req *volume_server_pb.DeleteCollectionRequest) (*volume_server_pb.DeleteCollectionResponse, error) {
 
 	resp := &volume_server_pb.DeleteCollectionResponse{}
 
+	/// 调用 store 的 DeleteCollection, 其中会调用 DiskLocation 的 DeleteCollectionFromDiskLocation
+	/// 触发调用 Volume 的 Destroy 和 EcVolume 的 Destroy 从硬盘中删除数据
 	err := vs.store.DeleteCollection(req.Collection)
 
 	if err != nil {
@@ -28,6 +31,7 @@ func (vs *VolumeServer) DeleteCollection(ctx context.Context, req *volume_server
 
 }
 
+/// 申请 volume
 func (vs *VolumeServer) AllocateVolume(ctx context.Context, req *volume_server_pb.AllocateVolumeRequest) (*volume_server_pb.AllocateVolumeResponse, error) {
 
 	resp := &volume_server_pb.AllocateVolumeResponse{}

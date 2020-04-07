@@ -8,6 +8,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/glog"
 )
 
+/// 输出内存和CPU的profile信息到文件
 func SetupProfiling(cpuProfile, memProfile string) {
 	if cpuProfile != "" {
 		f, err := os.Create(cpuProfile)

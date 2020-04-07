@@ -53,6 +53,7 @@ func NewStore(grpcDialOption grpc.DialOption, port int, ip, publicUrl string, di
 	s.Locations = make([]*DiskLocation, 0)
 	for i := 0; i < len(dirnames); i++ {
 		location := NewDiskLocation(dirnames[i], maxVolumeCounts[i])
+		/// 递归加载 volume
 		location.loadExistingVolumes(needleMapKind)
 		s.Locations = append(s.Locations, location)
 		stats.VolumeServerMaxVolumeCounter.Add(float64(maxVolumeCounts[i]))
@@ -65,6 +66,8 @@ func NewStore(grpcDialOption grpc.DialOption, port int, ip, publicUrl string, di
 
 	return
 }
+
+/// 申请 volume
 func (s *Store) AddVolume(volumeId needle.VolumeId, collection string, needleMapKind NeedleMapType, replicaPlacement string, ttlString string, preallocate int64, MemoryMapMaxSizeMb uint32) error {
 	rt, e := super_block.NewReplicaPlacementFromString(replicaPlacement)
 	if e != nil {
@@ -77,6 +80,8 @@ func (s *Store) AddVolume(volumeId needle.VolumeId, collection string, needleMap
 	e = s.addVolume(volumeId, collection, needleMapKind, rt, ttl, preallocate, MemoryMapMaxSizeMb)
 	return e
 }
+
+/// 删除 Collection
 func (s *Store) DeleteCollection(collection string) (e error) {
 	for _, location := range s.Locations {
 		e = location.DeleteCollectionFromDiskLocation(collection)
@@ -96,6 +101,8 @@ func (s *Store) findVolume(vid needle.VolumeId) *Volume {
 	}
 	return nil
 }
+
+/// 分配 volume 的时候会调用该函数找到空闲 location
 func (s *Store) FindFreeLocation() (ret *DiskLocation) {
 	max := 0
 	for _, location := range s.Locations {
@@ -110,16 +117,19 @@ func (s *Store) FindFreeLocation() (ret *DiskLocation) {
 	}
 	return ret
 }
+/// 增加 卷
 func (s *Store) addVolume(vid needle.VolumeId, collection string, needleMapKind NeedleMapType, replicaPlacement *super_block.ReplicaPlacement, ttl *needle.TTL, preallocate int64, memoryMapMaxSizeMb uint32) error {
 	if s.findVolume(vid) != nil {
 		return fmt.Errorf("Volume Id %d already exists!", vid)
 	}
+	/// 找到 空闲 location
 	if location := s.FindFreeLocation(); location != nil {
 		glog.V(0).Infof("In dir %s adds volume:%v collection:%s replicaPlacement:%v ttl:%v",
 			location.Directory, vid, collection, replicaPlacement, ttl)
 		if volume, err := NewVolume(location.Directory, collection, vid, needleMapKind, replicaPlacement, ttl, preallocate, memoryMapMaxSizeMb); err == nil {
 			location.SetVolume(vid, volume)
 			glog.V(0).Infof("add volume %d", vid)
+			/// 申请成功后 会写入该 channel, 该 channel 会在 doHeartbeat 中读取, 发送给 leader master
 			s.NewVolumesChan <- master_pb.VolumeShortInformationMessage{
 				Id:               uint32(vid),
 				Collection:       collection,
@@ -190,6 +200,8 @@ func (s *Store) SetRack(rack string) {
 	s.rack = rack
 }
 
+/// volume server 的 doHeartbeat 函数中调用, 用于向 master 打点报告, master 只关心 volume 信息
+/// Store->DiskLocation->Volume->Needle
 func (s *Store) CollectHeartbeat() *master_pb.Heartbeat {
 	var volumeMessages []*master_pb.VolumeInformationMessage
 	maxVolumeCount := 0
@@ -246,12 +258,14 @@ func (s *Store) CollectHeartbeat() *master_pb.Heartbeat {
 
 }
 
+/// Store->DiskLocation->Volume->Needle
 func (s *Store) Close() {
 	for _, location := range s.Locations {
 		location.Close()
 	}
 }
 
+/// 写入一个 volume 中的一个文件 needle, 数据进行 append, 索引信息添加到 KV 存储中
 func (s *Store) WriteVolumeNeedle(i needle.VolumeId, n *needle.Needle) (isUnchanged bool, err error) {
 	if v := s.findVolume(i); v != nil {
 		if v.IsReadOnly() {
@@ -271,6 +285,7 @@ func (s *Store) WriteVolumeNeedle(i needle.VolumeId, n *needle.Needle) (isUnchan
 	return
 }
 
+/// 删除 一个 needle, 是以追加的方式, 在原文件后面追加一个 长度 为 0 的空数据块
 func (s *Store) DeleteVolumeNeedle(i needle.VolumeId, n *needle.Needle) (uint32, error) {
 	if v := s.findVolume(i); v != nil {
 		if v.noWriteOrDelete {
@@ -285,6 +300,7 @@ func (s *Store) DeleteVolumeNeedle(i needle.VolumeId, n *needle.Needle) (uint32,
 	return 0, fmt.Errorf("volume %d not found on %s:%d", i, s.Ip, s.Port)
 }
 
+/// 从 volume 中读取一个 needle
 func (s *Store) ReadVolumeNeedle(i needle.VolumeId, n *needle.Needle) (int, error) {
 	if v := s.findVolume(i); v != nil {
 		return v.readNeedle(n)
@@ -309,6 +325,8 @@ func (s *Store) MarkVolumeReadonly(i needle.VolumeId) error {
 	return nil
 }
 
+/// 递归加载每个子目录中的卷信息
+/// Store->DiskLocation->Volume->Needle
 func (s *Store) MountVolume(i needle.VolumeId) error {
 	for _, location := range s.Locations {
 		if found := location.LoadVolume(i, s.NeedleMapType); found == true {
@@ -328,6 +346,7 @@ func (s *Store) MountVolume(i needle.VolumeId) error {
 	return fmt.Errorf("volume %d not found on disk", i)
 }
 
+/// 解挂卷 从 DiskLocation 的 卷列表中去除 但是不删除物理卷
 func (s *Store) UnmountVolume(i needle.VolumeId) error {
 	v := s.findVolume(i)
 	if v == nil {
@@ -352,6 +371,7 @@ func (s *Store) UnmountVolume(i needle.VolumeId) error {
 	return fmt.Errorf("volume %d not found on disk", i)
 }
 
+/// 物理删除 并从 DiskLocation 的卷列表中删除
 func (s *Store) DeleteVolume(i needle.VolumeId) error {
 	v := s.findVolume(i)
 	if v == nil {
@@ -385,11 +405,13 @@ func (s *Store) ConfigureVolume(i needle.VolumeId, replication string) error {
 		// load, modify, save
 		baseFileName := strings.TrimSuffix(fileInfo.Name(), filepath.Ext(fileInfo.Name()))
 		vifFile := filepath.Join(location.Directory, baseFileName+".vif")
+		/// 有就返回已存在的数据, 没有就返回一个空的 volumeInfo
 		volumeInfo, _, err := pb.MaybeLoadVolumeInfo(vifFile)
 		if err != nil {
 			return fmt.Errorf("volume %d fail to load vif", i)
 		}
 		volumeInfo.Replication = replication
+		/// 将 volumeInfo 再写入到文件
 		err = pb.SaveVolumeInfo(vifFile, volumeInfo)
 		if err != nil {
 			return fmt.Errorf("volume %d fail to save vif", i)

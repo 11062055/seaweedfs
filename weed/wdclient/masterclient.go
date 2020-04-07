@@ -22,6 +22,7 @@ type MasterClient struct {
 	vidMap
 }
 
+/// master 之间相互通信 的 client
 func NewMasterClient(grpcDialOption grpc.DialOption, clientName string, clientGrpcPort uint32, masters []string) *MasterClient {
 	return &MasterClient{
 		name:           clientName,
@@ -42,6 +43,7 @@ func (mc *MasterClient) WaitUntilConnected() {
 	}
 }
 
+/// master 之间保持连接 循环 更新 volume id 到 location 之间的对应关系
 func (mc *MasterClient) KeepConnectedToMaster() {
 	glog.V(1).Infof("%s bootstraps with masters %v", mc.name, mc.masters)
 	for {
@@ -50,6 +52,7 @@ func (mc *MasterClient) KeepConnectedToMaster() {
 	}
 }
 
+/// 连接到 master 循环 更新 volume id 到 location 之间的对应关系
 func (mc *MasterClient) tryAllMasters() {
 	nextHintedLeader := ""
 	for _, master := range mc.masters {
@@ -64,10 +67,12 @@ func (mc *MasterClient) tryAllMasters() {
 	}
 }
 
+/// 连接到 master 循环更新 volume id 到 location 的 映射
 func (mc *MasterClient) tryConnectToMaster(master string) (nextHintedLeader string) {
 	glog.V(1).Infof("%s Connecting to master %v", mc.name, master)
 	gprcErr := pb.WithMasterClient(master, mc.grpcDialOption, func(client master_pb.SeaweedClient) error {
 
+		/// stream 是 seaweedKeepConnectedClient
 		stream, err := client.KeepConnected(context.Background())
 		if err != nil {
 			glog.V(0).Infof("%s failed to keep connected to %s: %v", mc.name, master, err)
@@ -96,6 +101,7 @@ func (mc *MasterClient) tryConnectToMaster(master string) (nextHintedLeader stri
 				return nil
 			}
 
+			/// 记录每个master中的 volume id 和 对应的 位置 location url
 			// process new volume location
 			loc := Location{
 				Url:       volumeLocation.Url,

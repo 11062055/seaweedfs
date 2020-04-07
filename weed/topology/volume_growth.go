@@ -66,9 +66,11 @@ func (vg *VolumeGrowth) findVolumeCount(copyCount int) (count int) {
 	}
 	return
 }
-
+/// 扩容 实际是更改本地 相关 node 的 参数, 在本地通过 data center \ rack \ data node 层层找到符合要求的节点, 然后向目标节点发起 pb 请求申请扩容
+/// 最终调用 volume server 的 AllocateVolume
 func (vg *VolumeGrowth) AutomaticGrowByType(option *VolumeGrowOption, grpcDialOption grpc.DialOption, topo *Topology, targetCount int) (count int, err error) {
 	if targetCount == 0 {
+		/// 根据复制规则 决定 需要多少个 副本
 		targetCount = vg.findVolumeCount(option.ReplicaPlacement.GetCopyCount())
 	}
 	count, err = vg.GrowByCountAndType(grpcDialOption, targetCount, option, topo)
@@ -77,6 +79,8 @@ func (vg *VolumeGrowth) AutomaticGrowByType(option *VolumeGrowOption, grpcDialOp
 	}
 	return count, err
 }
+/// 扩容 在本地通过 data center \ rack \ data node 层层找到符合要求的节点, 然后向目标节点发起 pb 请求申请扩容
+/// 最终调用 volume server 的 AllocateVolume
 func (vg *VolumeGrowth) GrowByCountAndType(grpcDialOption grpc.DialOption, targetCount int, option *VolumeGrowOption, topo *Topology) (counter int, err error) {
 	vg.accessLock.Lock()
 	defer vg.accessLock.Unlock()
@@ -92,7 +96,10 @@ func (vg *VolumeGrowth) GrowByCountAndType(grpcDialOption grpc.DialOption, targe
 	return
 }
 
+/// 在本地通过 data center \ rack \ data node 层层找到符合要求的节点, 然后向目标节点发起 pb 请求申请扩容
+/// 最终调用 volume server 的 AllocateVolume
 func (vg *VolumeGrowth) findAndGrow(grpcDialOption grpc.DialOption, topo *Topology, option *VolumeGrowOption) (int, error) {
+	/// 这里会层层调用 data center \ rack \ data node 的相关函数以确定是否有合符规定的节点, 都是本地操作
 	servers, e := vg.findEmptySlotsForOneVolume(topo, option)
 	if e != nil {
 		return 0, e
@@ -101,6 +108,8 @@ func (vg *VolumeGrowth) findAndGrow(grpcDialOption grpc.DialOption, topo *Topolo
 	if raftErr != nil {
 		return 0, raftErr
 	}
+	/// 这里向目标节点发起 pb 请求申请扩容
+	/// 最终调用 volume server 的 AllocateVolume
 	err := vg.grow(grpcDialOption, topo, vid, option, servers...)
 	return len(servers), err
 }
@@ -110,16 +119,21 @@ func (vg *VolumeGrowth) findAndGrow(grpcDialOption grpc.DialOption, topo *Topolo
 // 2.2 collect all racks that have rp.SameRackCount+1
 // 2.2 collect all data centers that have DiffRackCount+rp.SameRackCount+1
 // 2. find rest data nodes
+/// 层层调用 data center \ rack \ data node 的 PickNodesByWeight 以确定是否有合符规定的节点, 都是本地操作
 func (vg *VolumeGrowth) findEmptySlotsForOneVolume(topo *Topology, option *VolumeGrowOption) (servers []*DataNode, err error) {
 	//find main datacenter and other data centers
 	rp := option.ReplicaPlacement
+	/// 获取包含 rp.DiffDataCenterCount+1 个节点 且满足 函数 func 的数据中心节点
 	mainDataCenter, otherDataCenters, dc_err := topo.PickNodesByWeight(rp.DiffDataCenterCount+1, func(node Node) error {
+		/// 数据中心不匹配
 		if option.DataCenter != "" && node.IsDataCenter() && node.Id() != NodeId(option.DataCenter) {
 			return fmt.Errorf("Not matching preferred data center:%s", option.DataCenter)
 		}
+		/// 机架 数目 不匹配
 		if len(node.Children()) < rp.DiffRackCount+1 {
 			return fmt.Errorf("Only has %d racks, not enough for %d.", len(node.Children()), rp.DiffRackCount+1)
 		}
+		/// 剩余空间不匹配
 		if node.FreeSpace() < int64(rp.DiffRackCount+rp.SameRackCount+1) {
 			return fmt.Errorf("Free:%d < Expected:%d", node.FreeSpace(), rp.DiffRackCount+rp.SameRackCount+1)
 		}
@@ -132,18 +146,21 @@ func (vg *VolumeGrowth) findEmptySlotsForOneVolume(topo *Topology, option *Volum
 				}
 			}
 			if possibleDataNodesCount >= rp.SameRackCount+1 {
+				/// 机架数加 1
 				possibleRacksCount++
 			}
 		}
 		if possibleRacksCount < rp.DiffRackCount+1 {
 			return fmt.Errorf("Only has %d racks with more than %d free data nodes, not enough for %d.", possibleRacksCount, rp.SameRackCount+1, rp.DiffRackCount+1)
 		}
+		/// 机架数满足 说明找到了数据中心节点
 		return nil
 	})
 	if dc_err != nil {
 		return nil, dc_err
 	}
 
+	/// 相同的方式寻找机架节点
 	//find main rack and other racks
 	mainRack, otherRacks, rackErr := mainDataCenter.(*DataCenter).PickNodesByWeight(rp.DiffRackCount+1, func(node Node) error {
 		if option.Rack != "" && node.IsRack() && node.Id() != NodeId(option.Rack) {
@@ -171,6 +188,7 @@ func (vg *VolumeGrowth) findEmptySlotsForOneVolume(topo *Topology, option *Volum
 		return nil, rackErr
 	}
 
+	/// 相同的方式寻找 数据节点
 	//find main rack and other racks
 	mainServer, otherServers, serverErr := mainRack.(*Rack).PickNodesByWeight(rp.SameRackCount+1, func(node Node) error {
 		if option.DataNode != "" && node.IsDataNode() && node.Id() != NodeId(option.DataNode) {
@@ -191,6 +209,7 @@ func (vg *VolumeGrowth) findEmptySlotsForOneVolume(topo *Topology, option *Volum
 	}
 	for _, rack := range otherRacks {
 		r := rand.Int63n(rack.FreeSpace())
+		/// 会递归调用 每个rack节点的子data节点 检查总计是否有 r 大小的空闲空间
 		if server, e := rack.ReserveOneVolume(r); e == nil {
 			servers = append(servers, server)
 		} else {
@@ -199,6 +218,7 @@ func (vg *VolumeGrowth) findEmptySlotsForOneVolume(topo *Topology, option *Volum
 	}
 	for _, datacenter := range otherDataCenters {
 		r := rand.Int63n(datacenter.FreeSpace())
+		/// 会递归调用 每个datacenter节点的子rank节点 检查总计是否有 r 大小的空闲空间
 		if server, e := datacenter.ReserveOneVolume(r); e == nil {
 			servers = append(servers, server)
 		} else {
@@ -208,6 +228,7 @@ func (vg *VolumeGrowth) findEmptySlotsForOneVolume(topo *Topology, option *Volum
 	return
 }
 
+/// 扩容 最终调用 volume server 的 AllocateVolume
 func (vg *VolumeGrowth) grow(grpcDialOption grpc.DialOption, topo *Topology, vid needle.VolumeId, option *VolumeGrowOption, servers ...*DataNode) error {
 	for _, server := range servers {
 		if err := AllocateVolume(server, grpcDialOption, vid, option); err == nil {
@@ -219,7 +240,9 @@ func (vg *VolumeGrowth) grow(grpcDialOption grpc.DialOption, topo *Topology, vid
 				Ttl:              option.Ttl,
 				Version:          needle.CurrentVersion,
 			}
+			/// 记录 volume 的信息
 			server.AddOrUpdateVolume(vi)
+			/// 并且更新到 volume layout 中去
 			topo.RegisterVolumeLayout(vi, server)
 			glog.V(0).Infoln("Created Volume", vid, "on", server.NodeImpl.String())
 		} else {

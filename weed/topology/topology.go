@@ -60,6 +60,7 @@ func NewTopology(id string, seq sequence.Sequencer, volumeSizeLimit uint64, puls
 	return t
 }
 
+/// 从 raft 中查看当前节点是不是 leader 节点
 func (t *Topology) IsLeader() bool {
 	if t.RaftServer != nil {
 		if t.RaftServer.State() == raft.Leader {
@@ -71,7 +72,7 @@ func (t *Topology) IsLeader() bool {
 	}
 	return false
 }
-
+/// 通过 raft 获取 leader
 func (t *Topology) Leader() (string, error) {
 	l := ""
 	if t.RaftServer != nil {
@@ -88,6 +89,7 @@ func (t *Topology) Leader() (string, error) {
 	return l, nil
 }
 
+/// 查找 特定 volume id 的位置, 调用 Collection 的 Lookup 和 VolumeLayout 的 Lookup 方法
 func (t *Topology) Lookup(collection string, vid needle.VolumeId) (dataNodes []*DataNode) {
 	//maybe an issue if lots of collections?
 	if collection == "" {
@@ -121,11 +123,14 @@ func (t *Topology) NextVolumeId() (needle.VolumeId, error) {
 	return next, nil
 }
 
+/// 查看是否有可写的 volume
 func (t *Topology) HasWritableVolume(option *VolumeGrowOption) bool {
+	/// 获取 VolumeLayout 布局
 	vl := t.GetVolumeLayout(option.Collection, option.ReplicaPlacement, option.Ttl)
 	return vl.GetActiveVolumeCount(option) > 0
 }
 
+/// 获取指定个数的可写节点, 递归调用 VolumeLayout 的 PickForWrite, 本地操作
 func (t *Topology) PickForWrite(count uint64, option *VolumeGrowOption) (string, uint64, *DataNode, error) {
 	vid, count, datanodes, err := t.GetVolumeLayout(option.Collection, option.ReplicaPlacement, option.Ttl).PickForWrite(count, option)
 	if err != nil {
@@ -138,12 +143,14 @@ func (t *Topology) PickForWrite(count uint64, option *VolumeGrowOption) (string,
 	return needle.NewFileId(*vid, fileId, rand.Uint32()).String(), count, datanodes.Head(), nil
 }
 
+/// 获取 集合 collection 中的 VolumeLayout 没有则创建
 func (t *Topology) GetVolumeLayout(collectionName string, rp *super_block.ReplicaPlacement, ttl *needle.TTL) *VolumeLayout {
 	return t.collectionMap.Get(collectionName, func() interface{} {
 		return NewCollection(collectionName, t.volumeSizeLimit, t.replicationAsMin)
 	}).(*Collection).GetOrCreateVolumeLayout(rp, ttl)
 }
 
+/// 从map中获取collection
 func (t *Topology) ListCollections(includeNormalVolumes, includeEcVolumes bool) (ret []string) {
 
 	mapOfCollections := make(map[string]bool)
@@ -178,6 +185,7 @@ func (t *Topology) DeleteCollection(collectionName string) {
 }
 
 func (t *Topology) RegisterVolumeLayout(v storage.VolumeInfo, dn *DataNode) {
+	/// 将 data node 注册到 volume layout 中去
 	t.GetVolumeLayout(v.Collection, v.ReplicaPlacement, v.Ttl).RegisterVolume(&v, dn)
 }
 func (t *Topology) UnRegisterVolumeLayout(v storage.VolumeInfo, dn *DataNode) {
@@ -189,6 +197,7 @@ func (t *Topology) UnRegisterVolumeLayout(v storage.VolumeInfo, dn *DataNode) {
 	}
 }
 
+/// 创建 data center
 func (t *Topology) GetOrCreateDataCenter(dcName string) *DataCenter {
 	for _, c := range t.Children() {
 		dc := c.(*DataCenter)
@@ -197,10 +206,12 @@ func (t *Topology) GetOrCreateDataCenter(dcName string) *DataCenter {
 		}
 	}
 	dc := NewDataCenter(dcName)
+	/// 将 data center 加入 topology 中
 	t.LinkChildNode(dc)
 	return dc
 }
 
+/// 更新节点 和 该节点的 volume 信息
 func (t *Topology) SyncDataNodeRegistration(volumes []*master_pb.VolumeInformationMessage, dn *DataNode) (newVolumes, deletedVolumes []storage.VolumeInfo) {
 	// convert into in memory struct storage.VolumeInfo
 	var volumeInfos []storage.VolumeInfo
@@ -212,16 +223,20 @@ func (t *Topology) SyncDataNodeRegistration(volumes []*master_pb.VolumeInformati
 		}
 	}
 	// find out the delta volumes
+	/// 更新节点的 volume 信息, 返回哪些是 新增的 哪些是删除 了的
 	newVolumes, deletedVolumes = dn.UpdateVolumes(volumeInfos)
+	/// 注册新增的节点
 	for _, v := range newVolumes {
 		t.RegisterVolumeLayout(v, dn)
 	}
+	/// 反注册删除了的节点
 	for _, v := range deletedVolumes {
 		t.UnRegisterVolumeLayout(v, dn)
 	}
 	return
 }
 
+/// 更新 和 删除 volume 信息
 func (t *Topology) IncrementalSyncDataNodeRegistration(newVolumes, deletedVolumes []*master_pb.VolumeShortInformationMessage, dn *DataNode) {
 	var newVis, oldVis []storage.VolumeInfo
 	for _, v := range newVolumes {
@@ -240,12 +255,15 @@ func (t *Topology) IncrementalSyncDataNodeRegistration(newVolumes, deletedVolume
 		}
 		oldVis = append(oldVis, vi)
 	}
+	/// 更新 或 删除 节点上的 volume 信息
 	dn.DeltaUpdateVolumes(newVis, oldVis)
 
 	for _, vi := range newVis {
+		/// 注册 volume
 		t.RegisterVolumeLayout(vi, dn)
 	}
 	for _, vi := range oldVis {
+		/// 反注册 volume
 		t.UnRegisterVolumeLayout(vi, dn)
 	}
 

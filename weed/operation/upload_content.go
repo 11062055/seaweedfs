@@ -43,6 +43,7 @@ func init() {
 
 var fileNameEscaper = strings.NewReplacer("\\", "\\\\", "\"", "\\\"")
 
+/// 上传文件 到 volume server
 // Upload sends a POST request to a volume server to upload the content with adjustable compression level
 func UploadData(uploadUrl string, filename string, cipher bool, data []byte, isInputGzipped bool, mtype string, pairMap map[string]string, jwt security.EncodedJwt) (uploadResult *UploadResult, err error) {
 	hash := md5.New()
@@ -75,6 +76,7 @@ func doUpload(uploadUrl string, filename string, cipher bool, reader io.Reader, 
 	return uploadResult, uploadErr, data
 }
 
+/// 上传文件 决定 是否 压缩 和 加密
 func doUploadData(uploadUrl string, filename string, cipher bool, data []byte, isInputGzipped bool, mtype string, pairMap map[string]string, jwt security.EncodedJwt) (uploadResult *UploadResult, err error) {
 	contentIsGzipped := isInputGzipped
 	shouldGzipNow := false
@@ -149,6 +151,7 @@ func doUploadData(uploadUrl string, filename string, cipher bool, data []byte, i
 	return uploadResult, err
 }
 
+/// 真正的上传文件
 func upload_content(uploadUrl string, fillBufferFunction func(w io.Writer) error, filename string, isGzipped bool, mtype string, pairMap map[string]string, jwt security.EncodedJwt) (*UploadResult, error) {
 	body_buf := bytes.NewBufferString("")
 	body_writer := multipart.NewWriter(body_buf)

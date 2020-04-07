@@ -127,6 +127,7 @@ func (ev *EcVolume) Close() {
 	}
 }
 
+/// 删除 递归调用EcVolumeShard的删除方法Destroy
 func (ev *EcVolume) Destroy() {
 
 	ev.Close()

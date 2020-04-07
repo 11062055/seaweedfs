@@ -42,6 +42,7 @@ type EtcdSequencer struct {
 	seqFile *os.File
 }
 
+/// ETCD序列号生成器
 func NewEtcdSequencer(etcdUrls string, metaFolder string) (*EtcdSequencer, error) {
 	file, err := openSequenceFile(metaFolder + "/" + SequencerFileName)
 	if nil != err {
@@ -65,6 +66,7 @@ func NewEtcdSequencer(etcdUrls string, metaFolder string) (*EtcdSequencer, error
 	}
 	glog.V(4).Infof("read sequence from file : %d", maxValue)
 
+	/// newSeq 是 etcd 中的 序列号 和 maxValue 的最大值
 	newSeq, err := setMaxSequenceToEtcd(keysApi, maxValue)
 	if err != nil {
 		return nil, err
@@ -77,11 +79,12 @@ func NewEtcdSequencer(etcdUrls string, metaFolder string) (*EtcdSequencer, error
 	}
 	return sequencer, nil
 }
-
+/// 从 etcd 获取下一个 ID
 func (es *EtcdSequencer) NextFileId(count uint64) uint64 {
 	es.sequenceLock.Lock()
 	defer es.sequenceLock.Unlock()
 
+	/// 超出了 当前的最大范围了 就从etcd获取一批ID 实际是 更新 maxSeqId
 	if (es.currentSeqId + count) >= es.maxSeqId {
 		reqSteps := DefaultEtcdSteps
 		if count > DefaultEtcdSteps {
@@ -110,6 +113,8 @@ func (es *EtcdSequencer) NextFileId(count uint64) uint64 {
 instead of collecting the max value from volume server,
 the max value should be saved in local config file and ETCD cluster
 */
+
+/// 从 etcd 中获取一个数 大于等于 seenValue
 func (es *EtcdSequencer) SetMax(seenValue uint64) {
 	es.sequenceLock.Lock()
 	defer es.sequenceLock.Unlock()
@@ -134,7 +139,7 @@ func (es *EtcdSequencer) GetMax() uint64 {
 func (es *EtcdSequencer) Peek() uint64 {
 	return es.currentSeqId
 }
-
+/// 从 etcd 获取一批 id, 实际是把 etcd 中存的值增加一个间隔, 小于该间隔的数预留为当前可使用的
 func batchGetSequenceFromEtcd(kvApi client.KeysAPI, step uint64) (uint64, error) {
 	if step <= 0 {
 		return 0, fmt.Errorf("the step must be large than 1")
@@ -177,6 +182,7 @@ return the value of EtcdKeySequence in the ETCD cluster;
 when the value of the EtcdKeySequence is less than the parameter maxSeq,
 return the value of the parameter maxSeq
 */
+/// 获取 etcd 中存储的值 和 maxSeq 二者之间的最大值
 func setMaxSequenceToEtcd(kvApi client.KeysAPI, maxSeq uint64) (uint64, error) {
 	maxSeqStr := strconv.FormatUint(maxSeq, 10)
 	ctx, cancel := context.WithTimeout(context.Background(), EtcdContextTimeoutSecond)
@@ -217,7 +223,7 @@ func setMaxSequenceToEtcd(kvApi client.KeysAPI, maxSeq uint64) (uint64, error) {
 		}
 	}
 }
-
+/// 打开或创建序列号文件 值初始化为 1
 func openSequenceFile(file string) (*os.File, error) {
 	_, err := os.Stat(file)
 	if os.IsNotExist(err) {
@@ -237,6 +243,8 @@ func openSequenceFile(file string) (*os.File, error) {
 /*
 read sequence and step from sequence file
 */
+
+/// 读序列号文件形如  sequence:step
 func readSequenceFile(file *os.File) (uint64, uint64, error) {
 	sequence := make([]byte, FileMaxSequenceLength)
 	size, err := file.ReadAt(sequence, 0)
@@ -265,6 +273,7 @@ func readSequenceFile(file *os.File) (uint64, uint64, error) {
 /**
 write the sequence and step to sequence file
 */
+/// 写序列号文件, 形如  sequence:step, 初始化为 step=sequence
 func writeSequenceFile(file *os.File, sequence, step uint64) error {
 	_ = step
 	seqStr := fmt.Sprintf("%d:%d", sequence, sequence)

@@ -5,7 +5,7 @@ import (
 
 	"github.com/chrislusf/seaweedfs/weed/storage/needle"
 )
-
+/// 同一个 volume id 对应 多个 节点
 type VolumeLocationList struct {
 	list []*DataNode
 }
@@ -27,6 +27,7 @@ func (dnll *VolumeLocationList) Length() int {
 	return len(dnll.list)
 }
 
+/// 将一个节点 data node 加入 一个 volume
 func (dnll *VolumeLocationList) Set(loc *DataNode) {
 	for i := 0; i < len(dnll.list); i++ {
 		if loc.Ip == dnll.list[i].Ip && loc.Port == dnll.list[i].Port {
@@ -66,9 +67,11 @@ func (dnll *VolumeLocationList) Refresh(freshThreshHold int64) {
 	}
 }
 
+/// 获取统计信息
 func (dnll *VolumeLocationList) Stats(vid needle.VolumeId, freshThreshHold int64) (size uint64, fileCount int) {
 	for _, dnl := range dnll.list {
 		if dnl.LastSeen < freshThreshHold {
+			/// 调用 DataNode 的 GetVolumesById
 			vinfo, err := dnl.GetVolumesById(vid)
 			if err == nil {
 				return vinfo.Size - vinfo.DeletedByteCount, vinfo.FileCount - vinfo.DeleteCount

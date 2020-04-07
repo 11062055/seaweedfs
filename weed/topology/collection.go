@@ -40,6 +40,7 @@ func (c *Collection) GetOrCreateVolumeLayout(rp *super_block.ReplicaPlacement, t
 	return vl.(*VolumeLayout)
 }
 
+/// 被 topology 的 Lookup 调用
 func (c *Collection) Lookup(vid needle.VolumeId) []*DataNode {
 	for _, vl := range c.storageType2VolumeLayout.Items() {
 		if vl != nil {
@@ -51,6 +52,7 @@ func (c *Collection) Lookup(vid needle.VolumeId) []*DataNode {
 	return nil
 }
 
+/// 列出所有 数据 节点, 调用 VolumeLayout 的 ListVolumeServers 在 map 中获取
 func (c *Collection) ListVolumeServers() (nodes []*DataNode) {
 	for _, vl := range c.storageType2VolumeLayout.Items() {
 		if vl != nil {

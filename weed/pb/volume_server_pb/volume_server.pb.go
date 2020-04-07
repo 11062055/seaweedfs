@@ -2467,6 +2467,7 @@ func (c *volumeServerClient) VacuumVolumeCleanup(ctx context.Context, in *Vacuum
 	return out, nil
 }
 
+/// 删除 volume server 的 collection
 func (c *volumeServerClient) DeleteCollection(ctx context.Context, in *DeleteCollectionRequest, opts ...grpc.CallOption) (*DeleteCollectionResponse, error) {
 	out := new(DeleteCollectionResponse)
 	err := grpc.Invoke(ctx, "/volume_server_pb.VolumeServer/DeleteCollection", in, out, c.cc, opts...)

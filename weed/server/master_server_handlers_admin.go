@@ -24,8 +24,10 @@ func (ms *MasterServer) collectionDeleteHandler(w http.ResponseWriter, r *http.R
 		writeJsonError(w, r, http.StatusBadRequest, fmt.Errorf("collection %s does not exist", collectionName))
 		return
 	}
+	/// 列出所有的数据节点 会依次调用 Collection 和 VolumeLayout 的 ListVolumeServers 方法
 	for _, server := range collection.ListVolumeServers() {
 		err := operation.WithVolumeServerClient(server.Url(), ms.grpcDialOption, func(client volume_server_pb.VolumeServerClient) error {
+			/// 会调用 volume server 的 DeleteCollection 从 硬盘中删除数据
 			_, deleteErr := client.DeleteCollection(context.Background(), &volume_server_pb.DeleteCollectionRequest{
 				Collection: collection.Name,
 			})
@@ -36,6 +38,7 @@ func (ms *MasterServer) collectionDeleteHandler(w http.ResponseWriter, r *http.R
 			return
 		}
 	}
+	/// master 本地内存存储也要删除
 	ms.Topo.DeleteCollection(collectionName)
 
 	w.WriteHeader(http.StatusNoContent)
@@ -48,7 +51,7 @@ func (ms *MasterServer) dirStatusHandler(w http.ResponseWriter, r *http.Request)
 	m["Topology"] = ms.Topo.ToMap()
 	writeJsonQuiet(w, r, http.StatusOK, m)
 }
-
+/// 清除文件空洞
 func (ms *MasterServer) volumeVacuumHandler(w http.ResponseWriter, r *http.Request) {
 	gcString := r.FormValue("garbageThreshold")
 	gcThreshold := ms.option.GarbageThreshold
@@ -62,10 +65,12 @@ func (ms *MasterServer) volumeVacuumHandler(w http.ResponseWriter, r *http.Reque
 		}
 	}
 	// glog.Infoln("garbageThreshold =", gcThreshold)
+	/// 会调用各个 volume server 的 Compact 方法进行垃圾空间回收, 采用复制算法
 	ms.Topo.Vacuum(ms.grpcDialOption, gcThreshold, ms.preallocateSize)
 	ms.dirStatusHandler(w, r)
 }
 
+/// 扩容
 func (ms *MasterServer) volumeGrowHandler(w http.ResponseWriter, r *http.Request) {
 	count := 0
 	option, err := ms.getVolumeGrowOption(r)
@@ -98,6 +103,7 @@ func (ms *MasterServer) volumeStatusHandler(w http.ResponseWriter, r *http.Reque
 	writeJsonQuiet(w, r, http.StatusOK, m)
 }
 
+/// 根据请求的 collection 和 volume id 进行请求的 跳转
 func (ms *MasterServer) redirectHandler(w http.ResponseWriter, r *http.Request) {
 	vid, _, _, _, _ := parseURLPath(r.URL.Path)
 	collection := r.FormValue("collection")
@@ -122,6 +128,7 @@ func (ms *MasterServer) selfUrl(r *http.Request) string {
 	}
 	return "localhost:" + strconv.Itoa(ms.option.Port)
 }
+/// 上传文件
 func (ms *MasterServer) submitFromMasterServerHandler(w http.ResponseWriter, r *http.Request) {
 	if ms.Topo.IsLeader() {
 		submitForClientHandler(w, r, ms.selfUrl(r), ms.grpcDialOption)
@@ -135,6 +142,7 @@ func (ms *MasterServer) submitFromMasterServerHandler(w http.ResponseWriter, r *
 	}
 }
 
+/// 查看是否还有 可写的 volume, 通过 查找 volume layout 的内存可写列表进行本地查找
 func (ms *MasterServer) HasWritableVolume(option *topology.VolumeGrowOption) bool {
 	vl := ms.Topo.GetVolumeLayout(option.Collection, option.ReplicaPlacement, option.Ttl)
 	return vl.GetActiveVolumeCount(option) > 0

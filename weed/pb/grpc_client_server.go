@@ -30,6 +30,7 @@ func init() {
 	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 1024
 }
 
+/// 生成 grpc server 参数是 grpc.ServerOption
 func NewGrpcServer(opts ...grpc.ServerOption) *grpc.Server {
 	var options []grpc.ServerOption
 	options = append(options,
@@ -75,6 +76,7 @@ func GrpcDial(ctx context.Context, address string, opts ...grpc.DialOption) (*gr
 	return grpc.DialContext(ctx, address, options...)
 }
 
+/// 获取连接池中的 grpc client 并用 函数 fn 检测连接
 func WithCachedGrpcClient(fn func(*grpc.ClientConn) error, address string, opts ...grpc.DialOption) error {
 
 	grpcClientsLock.Lock()
@@ -151,6 +153,7 @@ func WithMasterClient(master string, grpcDialOption grpc.DialOption, fn func(cli
 		return fmt.Errorf("failed to parse master grpc %v: %v", master, parseErr)
 	}
 
+	/// 获取一个grpc连接 并用 函数 fn 去检测连接的有效性
 	return WithCachedGrpcClient(func(grpcConnection *grpc.ClientConn) error {
 		client := master_pb.NewSeaweedClient(grpcConnection)
 		return fn(client)

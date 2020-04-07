@@ -41,6 +41,7 @@ type MasterOptions struct {
 	metricsIntervalSec *int
 }
 
+/// init 函数从配置文件获取 master 所需的参数
 func init() {
 	cmdMaster.Run = runMaster // break init cycle
 	m.port = cmdMaster.Flag.Int("port", 9333, "http listen port")
@@ -76,6 +77,7 @@ var (
 	masterMemProfile = cmdMaster.Flag.String("memprofile", "", "memory profile output file")
 )
 
+/// master执行入口函数、初始化 profile 信息、白名单列表
 func runMaster(cmd *Command, args []string) bool {
 
 	util.LoadConfiguration("security", false)
@@ -100,7 +102,7 @@ func runMaster(cmd *Command, args []string) bool {
 
 	return true
 }
-
+/// 真正开始一个 master
 func startMaster(masterOption MasterOptions, masterWhiteList []string) {
 
 	backend.LoadConfiguration(util.GetViper())
@@ -108,14 +110,17 @@ func startMaster(masterOption MasterOptions, masterWhiteList []string) {
 	myMasterAddress, peers := checkPeers(*masterOption.ip, *masterOption.port, *masterOption.peers)
 
 	r := mux.NewRouter()
+	/// 初始化一个 master server 结构体
 	ms := weed_server.NewMasterServer(r, masterOption.toMasterOption(masterWhiteList), peers)
 	listeningAddress := *masterOption.ipBind + ":" + strconv.Itoa(*masterOption.port)
 	glog.V(0).Infof("Start Seaweed Master %s at %s", util.VERSION, listeningAddress)
+	/// 初始化一个listen结构体
 	masterListener, e := util.NewListener(listeningAddress, 0)
 	if e != nil {
 		glog.Fatalf("Master startup error: %v", e)
 	}
 	// start raftServer
+	/// 初始化一个raft server
 	raftServer := weed_server.NewRaftServer(security.LoadClientTLS(util.GetViper(), "grpc.master"),
 		peers, myMasterAddress, *masterOption.metaFolder, ms.Topo, *masterOption.pulseSeconds)
 	if raftServer == nil {
@@ -130,13 +135,18 @@ func startMaster(masterOption MasterOptions, masterWhiteList []string) {
 		glog.Fatalf("master failed to listen on grpc port %d: %v", grpcPort, err)
 	}
 	// Create your protocol servers.
+	/// 生成一个 grpc server
 	grpcS := pb.NewGrpcServer(security.LoadServerTLS(util.GetViper(), "grpc.master"))
+
+	/// 将 grpc server 注册
 	master_pb.RegisterSeaweedServer(grpcS, ms)
+	/// 将 grpc server 和 raft server 注册到 protobuf 中
 	protobuf.RegisterRaftServer(grpcS, raftServer)
 	reflection.Register(grpcS)
 	glog.V(0).Infof("Start Seaweed Master %s grpc server at %s:%d", util.VERSION, *masterOption.ipBind, grpcPort)
 	go grpcS.Serve(grpcL)
 
+	///
 	go ms.MasterClient.KeepConnectedToMaster()
 
 	// start http server

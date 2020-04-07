@@ -63,6 +63,7 @@ type MasterServer struct {
 
 	grpcDialOption grpc.DialOption
 
+	/// 向 leader master 建立连接的 client
 	MasterClient *wdclient.MasterClient
 }
 
@@ -85,6 +86,7 @@ func NewMasterServer(r *mux.Router, option *MasterOption, peers []string) *Maste
 		preallocateSize = int64(option.VolumeSizeLimitMB) * (1 << 20)
 	}
 
+	/// 获取 master 之间的 grpc 相关信息 需要 grpc.master.key grpc.master.cert grpc.master.ca
 	grpcDialOption := security.LoadClientTLS(v, "grpc.master")
 	ms := &MasterServer{
 		option:          option,
@@ -93,20 +95,25 @@ func NewMasterServer(r *mux.Router, option *MasterOption, peers []string) *Maste
 		grpcDialOption:  grpcDialOption,
 		MasterClient:    wdclient.NewMasterClient(grpcDialOption, "master", 0, peers),
 	}
+	/// 当代理请求到 master 去时, 该 channel 用于控制最多多少个并发请求可以代理到 master, 防止太多请求打垮 master
 	ms.bounedLeaderChan = make(chan int, 16)
 
 	seq := ms.createSequencer(option)
 	if nil == seq {
 		glog.Fatalf("create sequencer failed.")
 	}
+	/// 新建 拓扑
 	ms.Topo = topology.NewTopology("topo", seq, uint64(ms.option.VolumeSizeLimitMB)*1024*1024, ms.option.PulseSeconds, replicationAsMin)
 	ms.vg = topology.NewDefaultVolumeGrowth()
 	glog.V(0).Infoln("Volume Size Limit is", ms.option.VolumeSizeLimitMB, "MB")
 
+	/// 初始化白名单机制
 	ms.guard = security.NewGuard(ms.option.WhiteList, signingKey, expiresAfterSec, readSigningKey, readExpiresAfterSec)
 
+	/// 处理 http 请求
 	if !ms.option.DisableHttp {
 		handleStaticResources2(r)
+		/// 获取各个数据中心\机架\节点\卷的信息
 		r.HandleFunc("/", ms.proxyToLeader(ms.uiStatusHandler))
 		r.HandleFunc("/ui/index.html", ms.uiStatusHandler)
 		r.HandleFunc("/dir/assign", ms.proxyToLeader(ms.guard.WhiteList(ms.dirAssignHandler)))
@@ -125,13 +132,16 @@ func NewMasterServer(r *mux.Router, option *MasterOption, peers []string) *Maste
 		r.HandleFunc("/{fileId}", ms.redirectHandler)
 	}
 
+	/// 收集 dead node 和 满 volume, 进行 空洞 压缩, 只有 leader 才执行, 会向各个 volume 发出 Compact 指令, 采用复制算法
 	ms.Topo.StartRefreshWritableVolumes(ms.grpcDialOption, ms.option.GarbageThreshold, ms.preallocateSize)
 
+	/// 启动管理脚本
 	ms.startAdminScripts()
 
 	return ms
 }
 
+/// 启动 raft server, leader master 是保存在 raft 中的
 func (ms *MasterServer) SetRaftServer(raftServer *RaftServer) {
 	ms.Topo.RaftServer = raftServer.raftServer
 	ms.Topo.RaftServer.AddEventListener(raft.LeaderChangeEventType, func(e raft.Event) {
@@ -152,11 +162,13 @@ func (ms *MasterServer) SetRaftServer(raftServer *RaftServer) {
 	}
 }
 
+/// 通过 raft 发现 leader master, 代理到 leader master 去处理请求
 func (ms *MasterServer) proxyToLeader(f func(w http.ResponseWriter, r *http.Request)) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if ms.Topo.IsLeader() {
 			f(w, r)
 		} else if ms.Topo.RaftServer != nil && ms.Topo.RaftServer.Leader() != "" {
+			/// 防止过多请求打到 leader 中去了
 			ms.bounedLeaderChan <- 1
 			defer func() { <-ms.bounedLeaderChan }()
 			targetUrl, err := url.Parse("http://" + ms.Topo.RaftServer.Leader())
@@ -166,6 +178,7 @@ func (ms *MasterServer) proxyToLeader(f func(w http.ResponseWriter, r *http.Requ
 				return
 			}
 			glog.V(4).Infoln("proxying to leader", ms.Topo.RaftServer.Leader())
+			/// 将请求代理到 leader 中去
 			proxy := httputil.NewSingleHostReverseProxy(targetUrl)
 			director := proxy.Director
 			proxy.Director = func(req *http.Request) {
@@ -218,13 +231,16 @@ func (ms *MasterServer) startAdminScripts() {
 
 	reg, _ := regexp.Compile(`'.*?'|".*?"|\S+`)
 
+	/// master 之间保持连接 循环 更新 volume id 到 location 之间的对应关系
 	go commandEnv.MasterClient.KeepConnectedToMaster()
 
 	go func() {
+		/// 阻塞直到 获取到了 master
 		commandEnv.MasterClient.WaitUntilConnected()
 
 		c := time.Tick(time.Duration(sleepMinutes) * time.Minute)
 		for range c {
+			/// master 执行 shell 启动脚本
 			if ms.Topo.IsLeader() {
 				for _, line := range scriptLines {
 
@@ -251,7 +267,7 @@ func (ms *MasterServer) startAdminScripts() {
 		}
 	}()
 }
-
+/// 序列号生成器
 func (ms *MasterServer) createSequencer(option *MasterOption) sequence.Sequencer {
 	var seq sequence.Sequencer
 	v := util.GetViper()

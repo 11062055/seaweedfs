@@ -13,6 +13,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/topology"
 )
 
+/// 根据 volume id 获取卷的 location 信息, 只有 leader master 才响应请求
 func (ms *MasterServer) LookupVolume(ctx context.Context, req *master_pb.LookupVolumeRequest) (*master_pb.LookupVolumeResponse, error) {
 
 	if !ms.Topo.IsLeader() {
@@ -20,6 +21,7 @@ func (ms *MasterServer) LookupVolume(ctx context.Context, req *master_pb.LookupV
 	}
 
 	resp := &master_pb.LookupVolumeResponse{}
+	/// 获取各个 volume id 的 location 信息, 从本地 map 中获取, 会通过 Volume 和 VolumeLayout 查找
 	volumeLocations := ms.lookupVolumeId(req.VolumeIds, req.Collection)
 
 	for _, result := range volumeLocations {
@@ -30,6 +32,7 @@ func (ms *MasterServer) LookupVolume(ctx context.Context, req *master_pb.LookupV
 				PublicUrl: loc.PublicUrl,
 			})
 		}
+		/// 每个 volume id 对应很多 location
 		resp.VolumeIdLocations = append(resp.VolumeIdLocations, &master_pb.LookupVolumeResponse_VolumeIdLocation{
 			VolumeId:  result.VolumeId,
 			Locations: locations,
@@ -40,6 +43,7 @@ func (ms *MasterServer) LookupVolume(ctx context.Context, req *master_pb.LookupV
 	return resp, nil
 }
 
+/// 分配 fid 和 url, 只有 master 才响应请求
 func (ms *MasterServer) Assign(ctx context.Context, req *master_pb.AssignRequest) (*master_pb.AssignResponse, error) {
 
 	if !ms.Topo.IsLeader() {
@@ -73,12 +77,14 @@ func (ms *MasterServer) Assign(ctx context.Context, req *master_pb.AssignRequest
 		MemoryMapMaxSizeMb: req.MemoryMapMaxSizeMb,
 	}
 
+	/// 查找是否有可写的 卷, 通过 查找 volume layout 的内存可写列表进行查找
 	if !ms.Topo.HasWritableVolume(option) {
 		if ms.Topo.FreeSpace() <= 0 {
 			return nil, fmt.Errorf("No free volumes left!")
 		}
 		ms.vgLock.Lock()
 		if !ms.Topo.HasWritableVolume(option) {
+			/// 扩容, 先在本地查找是否有满足要求的节点，如果有就向目标 volume server 节点发起 AllocateVolume 请求
 			if _, err = ms.vg.AutomaticGrowByType(option, ms.grpcDialOption, ms.Topo, int(req.WritableVolumeCount)); err != nil {
 				ms.vgLock.Unlock()
 				return nil, fmt.Errorf("Cannot grow volume group! %v", err)
@@ -86,6 +92,7 @@ func (ms *MasterServer) Assign(ctx context.Context, req *master_pb.AssignRequest
 		}
 		ms.vgLock.Unlock()
 	}
+	/// 调用 topo 的PickForWrite, 它会递归调用 VolumeLayout 的 PickForWrite 查找一个符合要求的节点, 本地操作
 	fid, count, dn, err := ms.Topo.PickForWrite(req.Count, option)
 	if err != nil {
 		return nil, fmt.Errorf("%v", err)
@@ -100,6 +107,7 @@ func (ms *MasterServer) Assign(ctx context.Context, req *master_pb.AssignRequest
 	}, nil
 }
 
+/// 获取统计信息, 本地操作
 func (ms *MasterServer) Statistics(ctx context.Context, req *master_pb.StatisticsRequest) (*master_pb.StatisticsResponse, error) {
 
 	if !ms.Topo.IsLeader() {
@@ -119,6 +127,7 @@ func (ms *MasterServer) Statistics(ctx context.Context, req *master_pb.Statistic
 	}
 
 	volumeLayout := ms.Topo.GetVolumeLayout(req.Collection, replicaPlacement, ttl)
+	/// 调用 VolumeLayout 的 Stats 函数
 	stats := volumeLayout.Stats()
 
 	totalSize := ms.Topo.GetMaxVolumeCount() * int64(ms.option.VolumeSizeLimitMB) * 1024 * 1024
@@ -132,12 +141,14 @@ func (ms *MasterServer) Statistics(ctx context.Context, req *master_pb.Statistic
 	return resp, nil
 }
 
+/// 获取 volume list, 只有 leader master 才执行, 调用 topology 的 ToTopologyInfo 方法
 func (ms *MasterServer) VolumeList(ctx context.Context, req *master_pb.VolumeListRequest) (*master_pb.VolumeListResponse, error) {
 
 	if !ms.Topo.IsLeader() {
 		return nil, raft.NotLeaderError
 	}
 
+	/// 调用 ToTopologyInfo 方法, 会递归调用 DataCenter 的 ToDataCenterInfo(), 其中递归调用 rack 和 data node 的相关方法获取整个拓扑信息
 	resp := &master_pb.VolumeListResponse{
 		TopologyInfo:      ms.Topo.ToTopologyInfo(),
 		VolumeSizeLimitMb: uint64(ms.option.VolumeSizeLimitMB),
@@ -146,6 +157,7 @@ func (ms *MasterServer) VolumeList(ctx context.Context, req *master_pb.VolumeLis
 	return resp, nil
 }
 
+/// 获取 ec volume, 只有 leader master 才执行
 func (ms *MasterServer) LookupEcVolume(ctx context.Context, req *master_pb.LookupEcVolumeRequest) (*master_pb.LookupEcVolumeResponse, error) {
 
 	if !ms.Topo.IsLeader() {
@@ -154,6 +166,7 @@ func (ms *MasterServer) LookupEcVolume(ctx context.Context, req *master_pb.Looku
 
 	resp := &master_pb.LookupEcVolumeResponse{}
 
+	/// LookupEcShards 直接从 topology 中 ecShardMap 中获取数据
 	ecLocations, found := ms.Topo.LookupEcShards(needle.VolumeId(req.VolumeId))
 
 	if !found {

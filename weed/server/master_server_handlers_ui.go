@@ -20,6 +20,7 @@ func (ms *MasterServer) uiStatusHandler(w http.ResponseWriter, r *http.Request) 
 		Counters   *stats.ServerStats
 	}{
 		util.VERSION,
+		/// 会递归调用 各个 data center \ rack \ data node 的 ToMap 方法, 获取统计信息
 		ms.Topo.ToMap(),
 		ms.Topo.RaftServer,
 		infos,

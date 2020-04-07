@@ -44,6 +44,7 @@ var (
 	BackendStorages         = make(map[string]BackendStorage)
 )
 
+/// 在master.go中调用,目前只支持 s3_backend, backend.BackendStorageFactories["s3"] = &S3BackendFactory{}
 // used by master to load remote storage configurations
 func LoadConfiguration(config *viper.Viper) {
 
@@ -122,6 +123,7 @@ func ToPbStorageBackends() (backends []*master_pb.StorageBackend) {
 	return
 }
 
+/// type.id
 func BackendNameToTypeId(backendName string) (backendType, backendId string) {
 	parts := strings.Split(backendName, ".")
 	if len(parts) == 1 {

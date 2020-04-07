@@ -2,6 +2,7 @@ package topology
 
 import "github.com/chrislusf/seaweedfs/weed/pb/master_pb"
 
+/// data center -> rack -> data node
 type DataCenter struct {
 	NodeImpl
 }
@@ -23,10 +24,12 @@ func (dc *DataCenter) GetOrCreateRack(rackName string) *Rack {
 		}
 	}
 	rack := NewRack(rackName)
+	/// 将 rack 加入 data center
 	dc.LinkChildNode(rack)
 	return rack
 }
 
+/// 获取数据中心的问题
 func (dc *DataCenter) ToMap() interface{} {
 	m := make(map[string]interface{})
 	m["Id"] = dc.Id()
@@ -41,6 +44,7 @@ func (dc *DataCenter) ToMap() interface{} {
 	return m
 }
 
+/// 获取数据中心的信息, 会调用 rack 的 ToRackInfo
 func (dc *DataCenter) ToDataCenterInfo() *master_pb.DataCenterInfo {
 	m := &master_pb.DataCenterInfo{
 		Id:                string(dc.Id()),

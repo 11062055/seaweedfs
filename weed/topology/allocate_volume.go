@@ -13,6 +13,7 @@ type AllocateVolumeResult struct {
 	Error string
 }
 
+/// 申请分配 volume, 进行 pb 请求
 func AllocateVolume(dn *DataNode, grpcDialOption grpc.DialOption, vid needle.VolumeId, option *VolumeGrowOption) error {
 
 	return operation.WithVolumeServerClient(dn.Url(), grpcDialOption, func(client volume_server_pb.VolumeServerClient) error {
