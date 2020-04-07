@@ -72,6 +72,7 @@ func (t *Topology) IsLeader() bool {
 	}
 	return false
 }
+
 /// 通过 raft 获取 leader
 func (t *Topology) Leader() (string, error) {
 	l := ""

@@ -5,6 +5,7 @@ import (
 
 	"github.com/chrislusf/seaweedfs/weed/storage/needle"
 )
+
 /// 同一个 volume id 对应 多个 节点
 type VolumeLocationList struct {
 	list []*DataNode

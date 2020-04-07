@@ -267,6 +267,7 @@ func (ms *MasterServer) startAdminScripts() {
 		}
 	}()
 }
+
 /// 序列号生成器
 func (ms *MasterServer) createSequencer(option *MasterOption) sequence.Sequencer {
 	var seq sequence.Sequencer

@@ -66,6 +66,7 @@ func (vg *VolumeGrowth) findVolumeCount(copyCount int) (count int) {
 	}
 	return
 }
+
 /// 扩容 实际是更改本地 相关 node 的 参数, 在本地通过 data center \ rack \ data node 层层找到符合要求的节点, 然后向目标节点发起 pb 请求申请扩容
 /// 最终调用 volume server 的 AllocateVolume
 func (vg *VolumeGrowth) AutomaticGrowByType(option *VolumeGrowOption, grpcDialOption grpc.DialOption, topo *Topology, targetCount int) (count int, err error) {

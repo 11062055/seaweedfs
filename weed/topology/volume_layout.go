@@ -12,6 +12,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/storage/needle"
 	"github.com/chrislusf/seaweedfs/weed/storage/super_block"
 )
+
 /// 保存 volume 到 机器 的映射, 是 机器 到 volume 的 逆, 以方便查询
 // mapping from volume to its locations, inverted from server to volume
 type VolumeLayout struct {
@@ -204,6 +205,7 @@ func (vl *VolumeLayout) PickForWrite(count uint64, option *VolumeGrowOption) (*n
 	}
 	return &vid, count, locationList, nil
 }
+
 /// 查看可写的 volume
 func (vl *VolumeLayout) GetActiveVolumeCount(option *VolumeGrowOption) int {
 	vl.accessLock.RLock()

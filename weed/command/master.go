@@ -102,6 +102,7 @@ func runMaster(cmd *Command, args []string) bool {
 
 	return true
 }
+
 /// 真正开始一个 master
 func startMaster(masterOption MasterOptions, masterWhiteList []string) {
 

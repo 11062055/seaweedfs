@@ -1951,6 +1951,7 @@ func _Seaweed_ListMasterClients_Handler(srv interface{}, ctx context.Context, de
 	}
 	return interceptor(ctx, in, info, handler)
 }
+
 /// 这个地方 保存了 rpc 方法
 var _Seaweed_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "master_pb.Seaweed",

@@ -79,6 +79,7 @@ func NewEtcdSequencer(etcdUrls string, metaFolder string) (*EtcdSequencer, error
 	}
 	return sequencer, nil
 }
+
 /// 从 etcd 获取下一个 ID
 func (es *EtcdSequencer) NextFileId(count uint64) uint64 {
 	es.sequenceLock.Lock()
@@ -139,6 +140,7 @@ func (es *EtcdSequencer) GetMax() uint64 {
 func (es *EtcdSequencer) Peek() uint64 {
 	return es.currentSeqId
 }
+
 /// 从 etcd 获取一批 id, 实际是把 etcd 中存的值增加一个间隔, 小于该间隔的数预留为当前可使用的
 func batchGetSequenceFromEtcd(kvApi client.KeysAPI, step uint64) (uint64, error) {
 	if step <= 0 {
@@ -223,6 +225,7 @@ func setMaxSequenceToEtcd(kvApi client.KeysAPI, maxSeq uint64) (uint64, error) {
 		}
 	}
 }
+
 /// 打开或创建序列号文件 值初始化为 1
 func openSequenceFile(file string) (*os.File, error) {
 	_, err := os.Stat(file)
