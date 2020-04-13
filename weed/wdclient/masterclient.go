@@ -13,7 +13,7 @@ import (
 )
 
 type MasterClient struct {
-	name           string
+	clientType     string
 	grpcPort       uint32
 	currentMaster  string
 	masters        []string
@@ -23,9 +23,9 @@ type MasterClient struct {
 }
 
 /// master 之间相互通信 的 client
-func NewMasterClient(grpcDialOption grpc.DialOption, clientName string, clientGrpcPort uint32, masters []string) *MasterClient {
+func NewMasterClient(grpcDialOption grpc.DialOption, clientType string, clientGrpcPort uint32, masters []string) *MasterClient {
 	return &MasterClient{
-		name:           clientName,
+		clientType:     clientType,
 		grpcPort:       clientGrpcPort,
 		masters:        masters,
 		grpcDialOption: grpcDialOption,
@@ -45,7 +45,7 @@ func (mc *MasterClient) WaitUntilConnected() {
 
 /// master 之间保持连接 循环 更新 volume id 到 location 之间的对应关系
 func (mc *MasterClient) KeepConnectedToMaster() {
-	glog.V(1).Infof("%s bootstraps with masters %v", mc.name, mc.masters)
+	glog.V(1).Infof("%s bootstraps with masters %v", mc.clientType, mc.masters)
 	for {
 		mc.tryAllMasters()
 		time.Sleep(time.Second)
@@ -69,28 +69,28 @@ func (mc *MasterClient) tryAllMasters() {
 
 /// 连接到 master 循环更新 volume id 到 location 的 映射
 func (mc *MasterClient) tryConnectToMaster(master string) (nextHintedLeader string) {
-	glog.V(1).Infof("%s Connecting to master %v", mc.name, master)
+	glog.V(1).Infof("%s Connecting to master %v", mc.clientType, master)
 	gprcErr := pb.WithMasterClient(master, mc.grpcDialOption, func(client master_pb.SeaweedClient) error {
 
 		/// stream 是 seaweedKeepConnectedClient
 		stream, err := client.KeepConnected(context.Background())
 		if err != nil {
-			glog.V(0).Infof("%s failed to keep connected to %s: %v", mc.name, master, err)
+			glog.V(0).Infof("%s failed to keep connected to %s: %v", mc.clientType, master, err)
 			return err
 		}
 
-		if err = stream.Send(&master_pb.KeepConnectedRequest{Name: mc.name, GrpcPort: mc.grpcPort}); err != nil {
-			glog.V(0).Infof("%s failed to send to %s: %v", mc.name, master, err)
+		if err = stream.Send(&master_pb.KeepConnectedRequest{Name: mc.clientType, GrpcPort: mc.grpcPort}); err != nil {
+			glog.V(0).Infof("%s failed to send to %s: %v", mc.clientType, master, err)
 			return err
 		}
 
-		glog.V(1).Infof("%s Connected to %v", mc.name, master)
+		glog.V(1).Infof("%s Connected to %v", mc.clientType, master)
 		mc.currentMaster = master
 
 		for {
 			volumeLocation, err := stream.Recv()
 			if err != nil {
-				glog.V(0).Infof("%s failed to receive from %s: %v", mc.name, master, err)
+				glog.V(0).Infof("%s failed to receive from %s: %v", mc.clientType, master, err)
 				return err
 			}
 
@@ -108,18 +108,18 @@ func (mc *MasterClient) tryConnectToMaster(master string) (nextHintedLeader stri
 				PublicUrl: volumeLocation.PublicUrl,
 			}
 			for _, newVid := range volumeLocation.NewVids {
-				glog.V(1).Infof("%s: %s adds volume %d", mc.name, loc.Url, newVid)
+				glog.V(1).Infof("%s: %s adds volume %d", mc.clientType, loc.Url, newVid)
 				mc.addLocation(newVid, loc)
 			}
 			for _, deletedVid := range volumeLocation.DeletedVids {
-				glog.V(1).Infof("%s: %s removes volume %d", mc.name, loc.Url, deletedVid)
+				glog.V(1).Infof("%s: %s removes volume %d", mc.clientType, loc.Url, deletedVid)
 				mc.deleteLocation(deletedVid, loc)
 			}
 		}
 
 	})
 	if gprcErr != nil {
-		glog.V(0).Infof("%s failed to connect with master %v: %v", mc.name, master, gprcErr)
+		glog.V(0).Infof("%s failed to connect with master %v: %v", mc.clientType, master, gprcErr)
 	}
 	return
 }

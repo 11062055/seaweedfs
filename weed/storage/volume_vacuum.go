@@ -367,7 +367,7 @@ func (v *Volume) copyDataAndGenerateIndexFile(dstName, idxName string, prealloca
 		dst backend.BackendStorageFile
 	)
 	/// 创建 目标 文件 .cpd 实际是一个临时硬盘文件
-	if dst, err = createVolumeFile(dstName, preallocate, 0); err != nil {
+	if dst, err = backend.CreateVolumeFile(dstName, preallocate, 0); err != nil {
 		return
 	}
 	defer dst.Close()
@@ -401,7 +401,7 @@ func copyDataBasedOnIndexFile(srcDatName, srcIdxName, dstDatName, datIdxName str
 		srcDatBackend, dstDatBackend backend.BackendStorageFile
 		dataFile                     *os.File
 	)
-	if dstDatBackend, err = createVolumeFile(dstDatName, preallocate, 0); err != nil {
+	if dstDatBackend, err = backend.CreateVolumeFile(dstDatName, preallocate, 0); err != nil {
 		return
 	}
 	defer dstDatBackend.Close()

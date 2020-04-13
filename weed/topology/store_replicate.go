@@ -23,9 +23,11 @@ func ReplicatedWrite(masterNode string, s *storage.Store, volumeId needle.Volume
 	//check JWT
 	jwt := security.GetJwt(r)
 
+	// check whether this is a replicated write request
 	var remoteLocations []operation.Location
 	if r.FormValue("type") != "replicate" {
 		/// 获取可写的远端副本位置
+		// this is the initial request
 		remoteLocations, err = getWritableRemoteReplications(s, volumeId, masterNode)
 		if err != nil {
 			glog.V(0).Infoln(err)
@@ -33,9 +35,15 @@ func ReplicatedWrite(masterNode string, s *storage.Store, volumeId needle.Volume
 		}
 	}
 
+	// read fsync value
+	fsync := false
+	if r.FormValue("fsync") == "true" {
+		fsync = true
+	}
+
 	if s.GetVolume(volumeId) != nil {
 		/// 写入本地一个 volume 中的一个文件 needle, 数据进行 append, 索引信息添加到 KV 存储中
-		isUnchanged, err = s.WriteVolumeNeedle(volumeId, n)
+		isUnchanged, err = s.WriteVolumeNeedle(volumeId, n, fsync)
 		if err != nil {
 			err = fmt.Errorf("failed to write to local disk: %v", err)
 			glog.V(0).Infoln(err)

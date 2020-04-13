@@ -65,6 +65,8 @@ type MasterServer struct {
 
 	/// 向 leader master 建立连接的 client
 	MasterClient *wdclient.MasterClient
+
+	currentAdminShellClient string
 }
 
 func NewMasterServer(r *mux.Router, option *MasterOption, peers []string) *MasterServer {
@@ -210,8 +212,8 @@ func (ms *MasterServer) startAdminScripts() {
 	v.SetDefault("master.maintenance.sleep_minutes", 17)
 	sleepMinutes := v.GetInt("master.maintenance.sleep_minutes")
 
-	v.SetDefault("master.filer.default_filer_url", "http://localhost:8888/")
-	filerURL := v.GetString("master.filer.default_filer_url")
+	v.SetDefault("master.filer.default", "localhost:8888")
+	filerHostPort := v.GetString("master.filer.default")
 
 	scriptLines := strings.Split(adminScripts, "\n")
 
@@ -221,9 +223,10 @@ func (ms *MasterServer) startAdminScripts() {
 	shellOptions.GrpcDialOption = security.LoadClientTLS(v, "grpc.master")
 	shellOptions.Masters = &masterAddress
 
-	shellOptions.FilerHost, shellOptions.FilerPort, shellOptions.Directory, err = util.ParseFilerUrl(filerURL)
+	shellOptions.FilerHost, shellOptions.FilerPort, err = util.ParseHostPort(filerHostPort)
+	shellOptions.Directory = "/"
 	if err != nil {
-		glog.V(0).Infof("failed to parse master.filer.default_filer_urll=%s : %v\n", filerURL, err)
+		glog.V(0).Infof("failed to parse master.filer.default = %s : %v\n", filerHostPort, err)
 		return
 	}
 
