@@ -14,6 +14,7 @@ import (
 
 func (s *Store) DeleteEcShardNeedle(ecVolume *erasure_coding.EcVolume, n *needle.Needle, cookie types.Cookie) (int64, error) {
 
+	/// 读取 ec shard 信息 如果本地缓存 中 没有 就从远处获取
 	count, err := s.ReadEcShardNeedle(ecVolume.VolumeId, n)
 
 	if err != nil {

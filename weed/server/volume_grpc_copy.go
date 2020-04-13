@@ -112,6 +112,7 @@ func (vs *VolumeServer) VolumeCopy(ctx context.Context, req *volume_server_pb.Vo
 	}, err
 }
 
+/// 拷贝远端文件
 func (vs *VolumeServer) doCopyFile(client volume_server_pb.VolumeServerClient, isEcVolume bool, collection string, vid, compactRevision uint32, stopOffset uint64, baseFileName, ext string, isAppend, ignoreSourceFileNotFound bool) error {
 
 	copyFileClient, err := client.CopyFile(context.Background(), &volume_server_pb.CopyFileRequest{
@@ -127,6 +128,7 @@ func (vs *VolumeServer) doCopyFile(client volume_server_pb.VolumeServerClient, i
 		return fmt.Errorf("failed to start copying volume %d %s file: %v", vid, ext, err)
 	}
 
+	///  写入本地文件
 	err = writeToFile(copyFileClient, baseFileName+ext, util.NewWriteThrottler(vs.compactionBytePerSecond), isAppend)
 	if err != nil {
 		return fmt.Errorf("failed to copy %s file: %v", baseFileName+ext, err)
@@ -161,6 +163,7 @@ func checkCopyFiles(originFileInf *volume_server_pb.ReadVolumeFileStatusResponse
 	return nil
 }
 
+/// 从远端拷贝文件写入本地
 func writeToFile(client volume_server_pb.VolumeServer_CopyFileClient, fileName string, wt *util.WriteThrottler, isAppend bool) error {
 	glog.V(4).Infof("writing to %s", fileName)
 	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC

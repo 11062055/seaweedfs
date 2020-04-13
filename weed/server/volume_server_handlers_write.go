@@ -15,6 +15,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/topology"
 )
 
+/// 上传 volume 数据
 func (vs *VolumeServer) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	stats.VolumeServerRequestCounter.WithLabelValues("post").Inc()
@@ -49,6 +50,7 @@ func (vs *VolumeServer) PostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ret := operation.UploadResult{}
+	/// 写本地 和 远端 副本
 	isUnchanged, writeError := topology.ReplicatedWrite(vs.GetMaster(), vs.store, volumeId, needle, r)
 
 	// http 204 status code does not allow body
@@ -73,6 +75,7 @@ func (vs *VolumeServer) PostHandler(w http.ResponseWriter, r *http.Request) {
 	writeJsonQuiet(w, r, httpStatus, ret)
 }
 
+/// 删除 volume
 func (vs *VolumeServer) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	stats.VolumeServerRequestCounter.WithLabelValues("delete").Inc()
@@ -97,6 +100,7 @@ func (vs *VolumeServer) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	ecVolume, hasEcVolume := vs.store.FindEcVolume(volumeId)
 
+	/// 删除 ec shard
 	if hasEcVolume {
 		count, err := vs.store.DeleteEcShardNeedle(ecVolume, n, cookie)
 		writeDeleteResult(err, count, w, r)
@@ -119,6 +123,7 @@ func (vs *VolumeServer) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	count := int64(n.Size)
 
+	/// 删除 分块 chunks
 	if n.IsChunkedManifest() {
 		chunkManifest, e := operation.LoadChunkManifest(n.Data, n.IsGzipped())
 		if e != nil {
@@ -141,6 +146,7 @@ func (vs *VolumeServer) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	/// 删除副本
 	_, err := topology.ReplicatedDelete(vs.GetMaster(), vs.store, volumeId, n, r)
 
 	writeDeleteResult(err, count, w, r)

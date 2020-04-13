@@ -8,6 +8,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/pb/volume_server_pb"
 )
 
+/// 获取 硬盘 信息
 func fillInDiskStatus(disk *volume_server_pb.DiskStatus) {
 	fs := syscall.Statfs_t{}
 	err := syscall.Statfs(disk.Dir, &fs)

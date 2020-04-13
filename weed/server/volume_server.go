@@ -68,10 +68,12 @@ func NewVolumeServer(adminMux, publicMux *http.ServeMux, ip string,
 		fileSizeLimitBytes:      int64(fileSizeLimitMB) * 1024 * 1024,
 	}
 	vs.SeedMasterNodes = masterNodes
+	/// 读取 store 信息, 会递归加载 所有目录下的 volume 信息 Store -> DiskLocation -> Volume
 	vs.store = storage.NewStore(vs.grpcDialOption, port, ip, publicUrl, folders, maxCounts, vs.needleMapKind)
 
 	vs.guard = security.NewGuard(whiteList, signingKey, expiresAfterSec, readSigningKey, readExpiresAfterSec)
 
+	/// 后台的一些处理
 	handleStaticResources(adminMux)
 	if signingKey == "" || enableUiAccess {
 		// only expose the volume server details for safe environments
@@ -83,13 +85,16 @@ func NewVolumeServer(adminMux, publicMux *http.ServeMux, ip string,
 			adminMux.HandleFunc("/stats/disk", vs.guard.WhiteList(vs.statsDiskHandler))
 		*/
 	}
+	/// 用于处理内部后端请求 包括 volume 及其 副本的 增 删 查, 图片的 缩放扩大等
 	adminMux.HandleFunc("/", vs.privateStoreHandler)
 	if publicMux != adminMux {
 		// separated admin and public port
 		handleStaticResources(publicMux)
+		/// 用于处理内部后端请求 包括 volume 及其 副本的 查找, 图片的 缩放扩大等, 若非本地则返回 跳转
 		publicMux.HandleFunc("/", vs.publicReadOnlyHandler)
 	}
 
+	/// 循环向 master 发送心跳
 	go vs.heartbeat()
 	hostAddress := fmt.Sprintf("%s:%d", ip, port)
 	go stats.LoopPushingMetric("volumeServer", hostAddress, stats.VolumeServerGather,

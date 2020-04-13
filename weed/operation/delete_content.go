@@ -29,9 +29,11 @@ func ParseFileId(fid string) (vid string, key_cookie string, err error) {
 }
 
 // DeleteFiles batch deletes a list of fileIds
+/// 删除一批 fileIds, 从 master 处 获取 具体位置 然后将请求发送到各个 volume server 去
 func DeleteFiles(master string, usePublicUrl bool, grpcDialOption grpc.DialOption, fileIds []string) ([]*volume_server_pb.DeleteResult, error) {
 
 	lookupFunc := func(vids []string) (results map[string]LookupResult, err error) {
+		/// 从 master 处 查询一批 volume id 的位置
 		results, err = LookupVolumeIds(master, grpcDialOption, vids)
 		if err == nil && usePublicUrl {
 			for _, result := range results {
@@ -47,6 +49,7 @@ func DeleteFiles(master string, usePublicUrl bool, grpcDialOption grpc.DialOptio
 
 }
 
+/// 删除一批 fileIds, 从 master 处 获取 具体位置 然后将请求发送到各个 volume server 去
 func DeleteFilesWithLookupVolumeId(grpcDialOption grpc.DialOption, fileIds []string, lookupFunc func(vid []string) (map[string]LookupResult, error)) ([]*volume_server_pb.DeleteResult, error) {
 
 	var ret []*volume_server_pb.DeleteResult
@@ -70,6 +73,7 @@ func DeleteFilesWithLookupVolumeId(grpcDialOption grpc.DialOption, fileIds []str
 		vid_to_fileIds[vid] = append(vid_to_fileIds[vid], fileId)
 	}
 
+	/// 从 master 处 查询一批 volume id 的位置
 	lookupResults, err := lookupFunc(vids)
 	if err != nil {
 		return ret, err
@@ -85,6 +89,7 @@ func DeleteFilesWithLookupVolumeId(grpcDialOption grpc.DialOption, fileIds []str
 			)
 			continue
 		}
+		/// 统计每台机器有哪些需要被删除
 		for _, location := range result.Locations {
 			if _, ok := server_to_fileIds[location.Url]; !ok {
 				server_to_fileIds[location.Url] = make([]string, 0)
@@ -101,6 +106,7 @@ func DeleteFilesWithLookupVolumeId(grpcDialOption grpc.DialOption, fileIds []str
 		go func(server string, fidList []string) {
 			defer wg.Done()
 
+			/// 批量删除一台机器上面的 volume id
 			if deleteResults, deleteErr := DeleteFilesAtOneVolumeServer(server, grpcDialOption, fidList, true); deleteErr != nil {
 				err = deleteErr
 			} else if deleteResults != nil {
@@ -120,6 +126,7 @@ func DeleteFilesWithLookupVolumeId(grpcDialOption grpc.DialOption, fileIds []str
 }
 
 // DeleteFilesAtOneVolumeServer deletes a list of files that is on one volume server via gRpc
+/// 批量删除一台机器上面的 volume id
 func DeleteFilesAtOneVolumeServer(volumeServer string, grpcDialOption grpc.DialOption, fileIds []string, includeCookie bool) (ret []*volume_server_pb.DeleteResult, err error) {
 
 	err = WithVolumeServerClient(volumeServer, grpcDialOption, func(volumeServerClient volume_server_pb.VolumeServerClient) error {

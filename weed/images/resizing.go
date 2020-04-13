@@ -13,10 +13,12 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/glog"
 )
 
+/// 改变图片大小 从 read 处获取数据
 func Resized(ext string, read io.ReadSeeker, width, height int, mode string) (resized io.ReadSeeker, w int, h int) {
 	if width == 0 && height == 0 {
 		return read, 0, 0
 	}
+	/// 从 read 中获取原始数据
 	srcImage, _, err := image.Decode(read)
 	if err == nil {
 		bounds := srcImage.Bounds()

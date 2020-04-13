@@ -46,6 +46,7 @@ func (s *Store) CollectErasureCodingHeartbeat() *master_pb.Heartbeat {
 
 }
 
+/// 挂载 ec shards
 func (s *Store) MountEcShards(collection string, vid needle.VolumeId, shardId erasure_coding.ShardId) error {
 	for _, location := range s.Locations {
 		if err := location.LoadEcShard(collection, vid, shardId); err == nil {
@@ -53,6 +54,7 @@ func (s *Store) MountEcShards(collection string, vid needle.VolumeId, shardId er
 
 			var shardBits erasure_coding.ShardBits
 
+			/// doHeart 读取通道消息往 master 报告
 			s.NewEcShardsChan <- master_pb.VolumeEcShardInformationMessage{
 				Id:          uint32(vid),
 				Collection:  collection,
@@ -67,6 +69,7 @@ func (s *Store) MountEcShards(collection string, vid needle.VolumeId, shardId er
 	return fmt.Errorf("MountEcShards %d.%d not found on disk", vid, shardId)
 }
 
+/// 各个 location 解挂 volume
 func (s *Store) UnmountEcShards(vid needle.VolumeId, shardId erasure_coding.ShardId) error {
 
 	ecShard, found := s.findEcShard(vid, shardId)
@@ -82,8 +85,10 @@ func (s *Store) UnmountEcShards(vid needle.VolumeId, shardId erasure_coding.Shar
 	}
 
 	for _, location := range s.Locations {
+		/// 各个 location 解挂 volume
 		if deleted := location.UnloadEcShard(vid, shardId); deleted {
 			glog.V(0).Infof("UnmountEcShards %d.%d", vid, shardId)
+			/// doHeartbeat 向 master 报告 解除挂载的信息
 			s.DeletedEcShardsChan <- message
 			return nil
 		}
@@ -215,6 +220,7 @@ func forgetShardId(ecVolume *erasure_coding.EcVolume, shardId erasure_coding.Sha
 	ecVolume.ShardLocationsLock.Unlock()
 }
 
+/// 从缓存中取 如果不是最新的 就从远处 volume server 中去取
 func (s *Store) cachedLookupEcShardLocations(ecVolume *erasure_coding.EcVolume) (err error) {
 
 	shardCount := len(ecVolume.ShardLocations)
@@ -276,6 +282,7 @@ func (s *Store) readRemoteEcShardInterval(sourceDataNodes []string, needleId typ
 	return
 }
 
+/// 从远处获取 ec shard 信息
 func (s *Store) doReadRemoteEcShardInterval(sourceDataNode string, needleId types.NeedleId, vid needle.VolumeId, shardId erasure_coding.ShardId, buf []byte, offset int64) (n int, is_deleted bool, err error) {
 
 	err = operation.WithVolumeServerClient(sourceDataNode, s.grpcDialOption, func(client volume_server_pb.VolumeServerClient) error {
@@ -344,9 +351,11 @@ func (s *Store) recoverOneRemoteEcShardInterval(needleId types.NeedleId, ecVolum
 		go func(shardId erasure_coding.ShardId, locations []string) {
 			defer wg.Done()
 			data := make([]byte, len(buf))
+			/// 从远处 获取 ec volume
 			nRead, isDeleted, readErr := s.readRemoteEcShardInterval(locations, needleId, ecVolume.VolumeId, shardId, data, offset)
 			if readErr != nil {
 				glog.V(3).Infof("recover: readRemoteEcShardInterval %d.%d %d bytes from %+v: %v", ecVolume.VolumeId, shardId, nRead, locations, readErr)
+				/// 从 ecVolume.ShardLocations 中 删除 shardId
 				forgetShardId(ecVolume, shardId)
 			}
 			if isDeleted {
@@ -372,6 +381,7 @@ func (s *Store) recoverOneRemoteEcShardInterval(needleId types.NeedleId, ecVolum
 	return len(buf), is_deleted, nil
 }
 
+/// 从 DiskLocation 中获取 ec volume 信息
 func (s *Store) EcVolumes() (ecVolumes []*erasure_coding.EcVolume) {
 	for _, location := range s.Locations {
 		location.ecVolumesLock.RLock()

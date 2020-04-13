@@ -12,15 +12,18 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/util"
 )
 
+/// 获取 一个 volume server 上的所有统计信息
 func (vs *VolumeServer) uiStatusHandler(w http.ResponseWriter, r *http.Request) {
 	infos := make(map[string]interface{})
 	infos["Up Time"] = time.Now().Sub(startTime).String()
 	var ds []*volume_server_pb.DiskStatus
 	for _, loc := range vs.store.Locations {
 		if dir, e := filepath.Abs(loc.Directory); e == nil {
+			/// 获取 硬盘 信息 DiskStatus
 			ds = append(ds, stats.NewDiskStatus(dir))
 		}
 	}
+	/// 获取 所有的 VolumeInfo
 	volumeInfos := vs.store.VolumeInfos()
 	var normalVolumeInfos, remoteVolumeInfos []*storage.VolumeInfo
 	for _, vinfo := range volumeInfos {

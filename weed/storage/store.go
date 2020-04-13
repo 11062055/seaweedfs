@@ -48,6 +48,8 @@ func (s *Store) String() (str string) {
 	return
 }
 
+/// 递归加载一个 store 的目录下的 volume
+/// Store -> DiskLocation -> Volume
 func NewStore(grpcDialOption grpc.DialOption, port int, ip, publicUrl string, dirnames []string, maxVolumeCounts []int, needleMapKind NeedleMapType) (s *Store) {
 	s = &Store{grpcDialOption: grpcDialOption, Port: port, Ip: ip, PublicUrl: publicUrl, NeedleMapType: needleMapKind}
 	s.Locations = make([]*DiskLocation, 0)
@@ -145,6 +147,7 @@ func (s *Store) addVolume(vid needle.VolumeId, collection string, needleMapKind 
 	return fmt.Errorf("No more free space left")
 }
 
+/// 获取 卷信息 VolumeInfo
 func (s *Store) VolumeInfos() (allStats []*VolumeInfo) {
 	for _, location := range s.Locations {
 		stats := collectStatsForOneLocation(location)
@@ -154,6 +157,7 @@ func (s *Store) VolumeInfos() (allStats []*VolumeInfo) {
 	return allStats
 }
 
+/// 获取 所有 卷的 VolumeInfo
 func collectStatsForOneLocation(location *DiskLocation) (stats []*VolumeInfo) {
 	location.volumesLock.RLock()
 	defer location.volumesLock.RUnlock()
@@ -201,6 +205,7 @@ func (s *Store) SetRack(rack string) {
 }
 
 /// volume server 的 doHeartbeat 函数中调用, 用于向 master 打点报告, master 只关心 volume 信息
+/// 还有个作用就是 回收 本地过期的 volume
 /// Store->DiskLocation->Volume->Needle
 func (s *Store) CollectHeartbeat() *master_pb.Heartbeat {
 	var volumeMessages []*master_pb.VolumeInformationMessage
@@ -332,6 +337,7 @@ func (s *Store) MountVolume(i needle.VolumeId) error {
 		if found := location.LoadVolume(i, s.NeedleMapType); found == true {
 			glog.V(0).Infof("mount volume %d", i)
 			v := s.findVolume(i)
+			/// 挂载成功后 会写入该 channel, 该 channel 会在 doHeartbeat 中读取, 发送给 leader master
 			s.NewVolumesChan <- master_pb.VolumeShortInformationMessage{
 				Id:               uint32(v.Id),
 				Collection:       v.Collection,
@@ -363,6 +369,7 @@ func (s *Store) UnmountVolume(i needle.VolumeId) error {
 	for _, location := range s.Locations {
 		if err := location.UnloadVolume(i); err == nil {
 			glog.V(0).Infof("UnmountVolume %d", i)
+			/// 用于 移步 向 master 打点
 			s.DeletedVolumesChan <- message
 			return nil
 		}
@@ -387,6 +394,7 @@ func (s *Store) DeleteVolume(i needle.VolumeId) error {
 	for _, location := range s.Locations {
 		if error := location.deleteVolumeById(i); error == nil {
 			glog.V(0).Infof("DeleteVolume %d", i)
+			/// 用于 移步 向 master 打点
 			s.DeletedVolumesChan <- message
 			return nil
 		}

@@ -9,6 +9,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/util"
 )
 
+/// 获取硬盘信息 DiskStatus
 func (vs *VolumeServer) statusHandler(w http.ResponseWriter, r *http.Request) {
 	m := make(map[string]interface{})
 	m["Version"] = util.VERSION
@@ -23,6 +24,7 @@ func (vs *VolumeServer) statusHandler(w http.ResponseWriter, r *http.Request) {
 	writeJsonQuiet(w, r, http.StatusOK, m)
 }
 
+/// 获取硬盘信息 DiskStatus
 func (vs *VolumeServer) statsDiskHandler(w http.ResponseWriter, r *http.Request) {
 	m := make(map[string]interface{})
 	m["Version"] = util.VERSION

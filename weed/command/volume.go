@@ -103,6 +103,7 @@ func runVolume(cmd *Command, args []string) bool {
 func (v VolumeServerOptions) startVolumeServer(volumeFolders, maxVolumeCounts, volumeWhiteListOption string) {
 
 	// Set multiple folders and each folder's max volume count limit'
+	/// 每个目录最多有多少个 volume
 	v.folders = strings.Split(volumeFolders, ",")
 	maxCountStrings := strings.Split(maxVolumeCounts, ",")
 	for _, maxString := range maxCountStrings {
@@ -139,6 +140,7 @@ func (v VolumeServerOptions) startVolumeServer(volumeFolders, maxVolumeCounts, v
 
 	volumeMux := http.NewServeMux()
 	publicVolumeMux := volumeMux
+	/// 公网端口 和 内网端口不一样
 	if v.isSeparatedPublicPort() {
 		publicVolumeMux = http.NewServeMux()
 	}
@@ -153,8 +155,10 @@ func (v VolumeServerOptions) startVolumeServer(volumeFolders, maxVolumeCounts, v
 		volumeNeedleMapKind = storage.NeedleMapLevelDbLarge
 	}
 
+	/// master servers like 'a.b.c.d,e.f.g.h'
 	masters := *v.masters
 
+	/// 生成 volume server, 会递归加载卷信息, 注册 内部 handler, 循环向 master 发送心跳
 	volumeServer := weed_server.NewVolumeServer(volumeMux, publicVolumeMux,
 		*v.ip, *v.port, *v.publicUrl,
 		v.folders, v.folderMaxLimits,
@@ -167,11 +171,13 @@ func (v VolumeServerOptions) startVolumeServer(volumeFolders, maxVolumeCounts, v
 	)
 
 	// starting grpc server
+	/// 注册 volume server 的 _VolumeServer_serviceDesc
 	grpcS := v.startGrpcService(volumeServer)
 
 	// starting public http server
 	var publicHttpDown httpdown.Server
 	if v.isSeparatedPublicPort() {
+		/// 开始 对外 的 Volume Mux
 		publicHttpDown = v.startPublicHttpService(publicVolumeMux)
 		if nil == publicHttpDown {
 			glog.Fatalf("start public http service failed")
@@ -179,9 +185,11 @@ func (v VolumeServerOptions) startVolumeServer(volumeFolders, maxVolumeCounts, v
 	}
 
 	// starting the cluster http server
+	/// 开始 cluster http service
 	clusterHttpServer := v.startClusterHttpService(volumeMux)
 
 	stopChain := make(chan struct{})
+	/// 注册信号的回调
 	util.OnInterrupt(func() {
 		fmt.Println("volume server has be killed")
 		var startTime time.Time
@@ -189,6 +197,7 @@ func (v VolumeServerOptions) startVolumeServer(volumeFolders, maxVolumeCounts, v
 		// firstly, stop the public http service to prevent from receiving new user request
 		if nil != publicHttpDown {
 			startTime = time.Now()
+			/// 停止 对外 服务
 			if err := publicHttpDown.Stop(); err != nil {
 				glog.Warningf("stop the public http server failed, %v", err)
 			}
@@ -197,6 +206,7 @@ func (v VolumeServerOptions) startVolumeServer(volumeFolders, maxVolumeCounts, v
 		}
 
 		startTime = time.Now()
+		/// 停止 cluster http service
 		if err := clusterHttpServer.Stop(); err != nil {
 			glog.Warningf("stop the cluster http server failed, %v", err)
 		}
@@ -209,6 +219,8 @@ func (v VolumeServerOptions) startVolumeServer(volumeFolders, maxVolumeCounts, v
 		glog.V(0).Infof("graceful stop gRPC, elapsed [%d]", delta)
 
 		startTime = time.Now()
+		/// 停止 volume server, 会递归卸载卷信息, 停止向 master 发送心跳
+		/// 调用 Store->DiskLocation->Volume->Needle 的 Close
 		volumeServer.Shutdown()
 		delta = time.Now().Sub(startTime).Nanoseconds() / 1e6
 		glog.V(0).Infof("stop volume server, elapsed [%d]", delta)
@@ -235,7 +247,9 @@ func (v VolumeServerOptions) startGrpcService(vs volume_server_pb.VolumeServerSe
 	if err != nil {
 		glog.Fatalf("failed to listen on grpc port %d: %v", grpcPort, err)
 	}
+	/// 生成 grpc server
 	grpcS := pb.NewGrpcServer(security.LoadServerTLS(util.GetViper(), "grpc.volume"))
+	/// 注册 volume server 的 grpc 函数 _VolumeServer_serviceDesc
 	volume_server_pb.RegisterVolumeServerServer(grpcS, vs)
 	reflection.Register(grpcS)
 	go func() {
@@ -265,6 +279,7 @@ func (v VolumeServerOptions) startPublicHttpService(handler http.Handler) httpdo
 	return publicHttpDown
 }
 
+/// 开始 cluster http service
 func (v VolumeServerOptions) startClusterHttpService(handler http.Handler) httpdown.Server {
 	var (
 		certFile, keyFile string

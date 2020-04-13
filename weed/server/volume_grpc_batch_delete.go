@@ -11,12 +11,14 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/storage/types"
 )
 
+/// 批量删除 该台机器上的 volume
 func (vs *VolumeServer) BatchDelete(ctx context.Context, req *volume_server_pb.BatchDeleteRequest) (*volume_server_pb.BatchDeleteResponse, error) {
 
 	resp := &volume_server_pb.BatchDeleteResponse{}
 
 	now := uint64(time.Now().Unix())
 
+	/// 遍历一批 file id
 	for _, fid := range req.FileIds {
 		vid, id_cookie, err := operation.ParseFileId(fid)
 		if err != nil {
@@ -29,6 +31,7 @@ func (vs *VolumeServer) BatchDelete(ctx context.Context, req *volume_server_pb.B
 
 		n := new(needle.Needle)
 		volumeId, _ := needle.NewVolumeId(vid)
+		/// 不检查 cookie
 		if req.SkipCookieCheck {
 			n.Id, err = types.ParseNeedleId(id_cookie)
 			if err != nil {
@@ -39,6 +42,7 @@ func (vs *VolumeServer) BatchDelete(ctx context.Context, req *volume_server_pb.B
 				continue
 			}
 		} else {
+			/// 读取数据 并且 检查 cookie
 			n.ParsePath(id_cookie)
 			cookie := n.Cookie
 			if _, err := vs.store.ReadVolumeNeedle(volumeId, n); err != nil {

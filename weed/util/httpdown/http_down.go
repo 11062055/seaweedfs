@@ -27,6 +27,7 @@ const (
 // A Server allows encapsulates the process of accepting new connections and
 // serving them, and gracefully shutting down the listener without dropping
 // active connections.
+/// 平滑 终止的 http 服务器, 关闭时不 损失活跃连接
 type Server interface {
 	// Wait waits for the serving loop to finish. This will happen when Stop is
 	// called, at which point it returns no error, or if there is an error in the

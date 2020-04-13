@@ -36,6 +36,7 @@ Steps to apply erasure coding to .dat .idx files
 */
 
 // VolumeEcShardsGenerate generates the .ecx and .ec00 ~ .ec13 files
+/// 生成 .ecx 文件 和 .ec00 ~ .ec13 文件 和 .vif 文件
 func (vs *VolumeServer) VolumeEcShardsGenerate(ctx context.Context, req *volume_server_pb.VolumeEcShardsGenerateRequest) (*volume_server_pb.VolumeEcShardsGenerateResponse, error) {
 
 	v := vs.store.GetVolume(needle.VolumeId(req.VolumeId))
@@ -49,16 +50,19 @@ func (vs *VolumeServer) VolumeEcShardsGenerate(ctx context.Context, req *volume_
 	}
 
 	// write .ecx file
+	/// 将 idx 文件中的 数据首先读入 leveldb 中 , 然后按序读出 并且写入 ecx 文件中去
 	if err := erasure_coding.WriteSortedFileFromIdx(baseFileName, ".ecx"); err != nil {
 		return nil, fmt.Errorf("WriteSortedFileFromIdx %s: %v", baseFileName, err)
 	}
 
 	// write .ec00 ~ .ec13 files
+	/// 将 dat 文件 输出 到 .ec00 ~ .ec13
 	if err := erasure_coding.WriteEcFiles(baseFileName); err != nil {
 		return nil, fmt.Errorf("WriteEcFiles %s: %v", baseFileName, err)
 	}
 
 	// write .vif files
+	///  写入 .vif 文件中去
 	if err := pb.SaveVolumeInfo(baseFileName+".vif", &volume_server_pb.VolumeInfo{Version: uint32(v.Version())}); err != nil {
 		return nil, fmt.Errorf("WriteEcFiles %s: %v", baseFileName, err)
 	}
@@ -67,6 +71,7 @@ func (vs *VolumeServer) VolumeEcShardsGenerate(ctx context.Context, req *volume_
 }
 
 // VolumeEcShardsRebuild generates the any of the missing .ec00 ~ .ec13 files
+/// 重建 .ec00 ~ .ec13 和 .ecx 文件
 func (vs *VolumeServer) VolumeEcShardsRebuild(ctx context.Context, req *volume_server_pb.VolumeEcShardsRebuildRequest) (*volume_server_pb.VolumeEcShardsRebuildResponse, error) {
 
 	baseFileName := erasure_coding.EcShardBaseFileName(req.Collection, int(req.VolumeId))
@@ -109,12 +114,14 @@ func (vs *VolumeServer) VolumeEcShardsCopy(ctx context.Context, req *volume_serv
 	err := operation.WithVolumeServerClient(req.SourceDataNode, vs.grpcDialOption, func(client volume_server_pb.VolumeServerClient) error {
 
 		// copy ec data slices
+		/// 拷贝 .ec00 ~ .ec13 等文件
 		for _, shardId := range req.ShardIds {
 			if err := vs.doCopyFile(client, true, req.Collection, req.VolumeId, math.MaxUint32, math.MaxInt64, baseFileName, erasure_coding.ToExt(int(shardId)), false, false); err != nil {
 				return err
 			}
 		}
 
+		/// 拷贝 .ecx 文件
 		if req.CopyEcxFile {
 
 			// copy ecx file
@@ -124,6 +131,7 @@ func (vs *VolumeServer) VolumeEcShardsCopy(ctx context.Context, req *volume_serv
 			return nil
 		}
 
+		/// 拷贝 .ecj 文件
 		if req.CopyEcjFile {
 			// copy ecj file
 			if err := vs.doCopyFile(client, true, req.Collection, req.VolumeId, math.MaxUint32, math.MaxInt64, baseFileName, ".ecj", true, true); err != nil {
@@ -131,6 +139,7 @@ func (vs *VolumeServer) VolumeEcShardsCopy(ctx context.Context, req *volume_serv
 			}
 		}
 
+		/// 拷贝 .vif 文件
 		if req.CopyVifFile {
 			// copy vif file
 			if err := vs.doCopyFile(client, true, req.Collection, req.VolumeId, math.MaxUint32, math.MaxInt64, baseFileName, ".vif", false, true); err != nil {
@@ -149,6 +158,7 @@ func (vs *VolumeServer) VolumeEcShardsCopy(ctx context.Context, req *volume_serv
 
 // VolumeEcShardsDelete local delete the .ecx and some ec data slices if not needed
 // the shard should not be mounted before calling this.
+/// 删除 ec shards , 删除 .ec00 ~ .ec13 文件 .ecx .ecj .vif
 func (vs *VolumeServer) VolumeEcShardsDelete(ctx context.Context, req *volume_server_pb.VolumeEcShardsDeleteRequest) (*volume_server_pb.VolumeEcShardsDeleteResponse, error) {
 
 	baseFilename := erasure_coding.EcShardBaseFileName(req.Collection, int(req.VolumeId))
@@ -157,10 +167,12 @@ func (vs *VolumeServer) VolumeEcShardsDelete(ctx context.Context, req *volume_se
 
 	found := false
 	for _, location := range vs.store.Locations {
+		/// .ecx 文件存在才删除
 		if util.FileExists(path.Join(location.Directory, baseFilename+".ecx")) {
 			found = true
 			baseFilename = path.Join(location.Directory, baseFilename)
 			for _, shardId := range req.ShardIds {
+				/// 删除 .ec00 ~ .ec13 文件
 				os.Remove(baseFilename + erasure_coding.ToExt(int(shardId)))
 			}
 			break
@@ -216,6 +228,7 @@ func (vs *VolumeServer) VolumeEcShardsDelete(ctx context.Context, req *volume_se
 func (vs *VolumeServer) VolumeEcShardsMount(ctx context.Context, req *volume_server_pb.VolumeEcShardsMountRequest) (*volume_server_pb.VolumeEcShardsMountResponse, error) {
 
 	for _, shardId := range req.ShardIds {
+		/// 各个 location 加载 volume 并且向 master 打点 报告 加载信息
 		err := vs.store.MountEcShards(req.Collection, needle.VolumeId(req.VolumeId), erasure_coding.ShardId(shardId))
 
 		if err != nil {
@@ -232,9 +245,11 @@ func (vs *VolumeServer) VolumeEcShardsMount(ctx context.Context, req *volume_ser
 	return &volume_server_pb.VolumeEcShardsMountResponse{}, nil
 }
 
+/// 各个 location 解挂 volume ec shard, 并且向 通道写入消息 以供 doHeartbeat 向 master 报告
 func (vs *VolumeServer) VolumeEcShardsUnmount(ctx context.Context, req *volume_server_pb.VolumeEcShardsUnmountRequest) (*volume_server_pb.VolumeEcShardsUnmountResponse, error) {
 
 	for _, shardId := range req.ShardIds {
+		/// 各个 location 解挂 volume ec shard, 并且向 通道写入消息 以供 doHeartbeat 向 master 报告
 		err := vs.store.UnmountEcShards(needle.VolumeId(req.VolumeId), erasure_coding.ShardId(shardId))
 
 		if err != nil {
@@ -251,12 +266,15 @@ func (vs *VolumeServer) VolumeEcShardsUnmount(ctx context.Context, req *volume_s
 	return &volume_server_pb.VolumeEcShardsUnmountResponse{}, nil
 }
 
+/// 读取 ec shard
 func (vs *VolumeServer) VolumeEcShardRead(req *volume_server_pb.VolumeEcShardReadRequest, stream volume_server_pb.VolumeServer_VolumeEcShardReadServer) error {
 
+	/// 找到 volume
 	ecVolume, found := vs.store.FindEcVolume(needle.VolumeId(req.VolumeId))
 	if !found {
 		return fmt.Errorf("VolumeEcShardRead not found ec volume id %d", req.VolumeId)
 	}
+	/// 根据 volume 找到 shard
 	ecShard, found := ecVolume.FindEcVolumeShard(erasure_coding.ShardId(req.ShardId))
 	if !found {
 		return fmt.Errorf("not found ec shard %d.%d", req.VolumeId, req.ShardId)
@@ -277,6 +295,7 @@ func (vs *VolumeServer) VolumeEcShardRead(req *volume_server_pb.VolumeEcShardRea
 	}
 	buffer := make([]byte, bufSize)
 
+	/// 得到偏移量 和 一共需要读取多少
 	startOffset, bytesToRead := req.Offset, req.Size
 
 	for bytesToRead > 0 {
@@ -301,7 +320,9 @@ func (vs *VolumeServer) VolumeEcShardRead(req *volume_server_pb.VolumeEcShardRea
 				return err
 			}
 
+			/// 移动 偏移量
 			startOffset += int64(bytesread)
+			/// 降低剩余待读取的
 			bytesToRead -= int64(bytesread)
 
 		}
@@ -334,6 +355,7 @@ func (vs *VolumeServer) VolumeEcBlobDelete(ctx context.Context, req *volume_serv
 				return resp, nil
 			}
 
+			/// 二分查找 needle 并且 调用 MarkNeedleDeleted 将 文件标记为删除
 			err = localEcVolume.DeleteNeedleFromEcx(types.NeedleId(req.FileKey))
 			if err != nil {
 				return nil, err
@@ -360,17 +382,20 @@ func (vs *VolumeServer) VolumeEcShardsToVolume(ctx context.Context, req *volume_
 	}
 
 	// calculate .dat file size
+	/// 通过遍历 ecx 文件获取 .dat 文件大小
 	datFileSize, err := erasure_coding.FindDatFileSize(baseFileName)
 	if err != nil {
 		return nil, fmt.Errorf("FindDatFileSize %s: %v", baseFileName, err)
 	}
 
 	// write .dat file from .ec00 ~ .ec09 files
+	/// 从 .ec00 ~ .ec13 文件拷贝到 .dat 文件中去
 	if err := erasure_coding.WriteDatFile(baseFileName, datFileSize); err != nil {
 		return nil, fmt.Errorf("WriteEcFiles %s: %v", baseFileName, err)
 	}
 
 	// write .idx file from .ecx and .ecj files
+	/// 将 .ecx 和 .ecj 文件写入 .idx 文件
 	if err := erasure_coding.WriteIdxFileFromEcIndex(baseFileName); err != nil {
 		return nil, fmt.Errorf("WriteIdxFileFromEcIndex %s: %v", baseFileName, err)
 	}

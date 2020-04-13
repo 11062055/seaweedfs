@@ -15,11 +15,13 @@ type VidInfo struct {
 	Locations       []Location
 	NextRefreshTime time.Time
 }
+/// volum id 到其 Location 的一个临时缓存
 type VidCache struct {
 	sync.RWMutex
 	cache []VidInfo
 }
 
+/// 从缓存中获取
 func (vc *VidCache) Get(vid string) ([]Location, error) {
 	id, err := strconv.Atoi(vid)
 	if err != nil {
@@ -39,6 +41,7 @@ func (vc *VidCache) Get(vid string) ([]Location, error) {
 	}
 	return nil, ErrorNotFound
 }
+/// 设置缓存
 func (vc *VidCache) Set(vid string, locations []Location, duration time.Duration) {
 	id, err := strconv.Atoi(vid)
 	if err != nil {

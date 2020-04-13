@@ -28,6 +28,7 @@ func (r httpRange) mimeHeader(contentType string, size int64) textproto.MIMEHead
 }
 
 // parseRange parses a Range header string as per RFC 2616.
+/// 解析 分段 的 范围
 func parseRange(s string, size int64) ([]httpRange, error) {
 	if s == "" {
 		return nil, nil // header not present

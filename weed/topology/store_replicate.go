@@ -17,6 +17,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/util"
 )
 
+/// 写副本
 func ReplicatedWrite(masterNode string, s *storage.Store, volumeId needle.VolumeId, n *needle.Needle, r *http.Request) (isUnchanged bool, err error) {
 
 	//check JWT
@@ -24,6 +25,7 @@ func ReplicatedWrite(masterNode string, s *storage.Store, volumeId needle.Volume
 
 	var remoteLocations []operation.Location
 	if r.FormValue("type") != "replicate" {
+		/// 获取可写的远端副本位置
 		remoteLocations, err = getWritableRemoteReplications(s, volumeId, masterNode)
 		if err != nil {
 			glog.V(0).Infoln(err)
@@ -32,6 +34,7 @@ func ReplicatedWrite(masterNode string, s *storage.Store, volumeId needle.Volume
 	}
 
 	if s.GetVolume(volumeId) != nil {
+		/// 写入本地一个 volume 中的一个文件 needle, 数据进行 append, 索引信息添加到 KV 存储中
 		isUnchanged, err = s.WriteVolumeNeedle(volumeId, n)
 		if err != nil {
 			err = fmt.Errorf("failed to write to local disk: %v", err)
@@ -41,6 +44,7 @@ func ReplicatedWrite(masterNode string, s *storage.Store, volumeId needle.Volume
 	}
 
 	if len(remoteLocations) > 0 { //send to other replica locations
+		/// 写入远端副本
 		if err = distributedOperation(remoteLocations, s, func(location operation.Location) error {
 			u := url.URL{
 				Scheme: "http",
@@ -72,6 +76,7 @@ func ReplicatedWrite(masterNode string, s *storage.Store, volumeId needle.Volume
 			}
 
 			// volume server do not know about encryption
+			/// 上传文件 到 volume server
 			_, err := operation.UploadData(u.String(), string(n.Name), false, n.Data, n.IsGzipped(), string(n.Mime), pairMap, jwt)
 			return err
 		}); err != nil {
@@ -82,6 +87,7 @@ func ReplicatedWrite(masterNode string, s *storage.Store, volumeId needle.Volume
 	return
 }
 
+/// 删除副本
 func ReplicatedDelete(masterNode string, store *storage.Store,
 	volumeId needle.VolumeId, n *needle.Needle,
 	r *http.Request) (size uint32, err error) {
@@ -151,6 +157,7 @@ func distributedOperation(locations []operation.Location, store *storage.Store, 
 	return ret.Error()
 }
 
+/// 获取可写的远端副本位置
 func getWritableRemoteReplications(s *storage.Store, volumeId needle.VolumeId, masterNode string) (
 	remoteLocations []operation.Location, err error) {
 

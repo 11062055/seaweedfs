@@ -112,6 +112,7 @@ func (l *DiskLocation) loadEcShards(shards []string, collection string, vid need
 	return nil
 }
 
+/// 读取 加载 所有 EcShards
 func (l *DiskLocation) loadAllEcShards() (err error) {
 
 	fileInfos, err := ioutil.ReadDir(l.Directory)

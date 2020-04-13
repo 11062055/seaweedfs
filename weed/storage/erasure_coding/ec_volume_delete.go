@@ -12,6 +12,7 @@ import (
 var (
 	MarkNeedleDeleted = func(file *os.File, offset int64) error {
 		b := make([]byte, types.SizeSize)
+		/// 将特定字段 写成 TombstoneFileSize 以标记为删除
 		util.Uint32toBytes(b, types.TombstoneFileSize)
 		n, err := file.WriteAt(b, offset+types.NeedleIdSize+types.OffsetSize)
 		if err != nil {
@@ -26,6 +27,7 @@ var (
 
 func (ev *EcVolume) DeleteNeedleFromEcx(needleId types.NeedleId) (err error) {
 
+	/// 二分查找 needle 并且 调用 MarkNeedleDeleted 将 文件标记为删除
 	_, _, err = SearchNeedleFromSortedIndex(ev.ecxFile, ev.ecxFileSize, needleId, MarkNeedleDeleted)
 
 	if err != nil {

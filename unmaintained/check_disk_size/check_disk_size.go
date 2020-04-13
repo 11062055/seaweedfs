@@ -21,6 +21,7 @@ func main() {
 
 }
 
+/// 获取 硬盘 信息
 func fillInDiskStatus(dir string) {
 	fs := syscall.Statfs_t{}
 	err := syscall.Statfs(dir, &fs)

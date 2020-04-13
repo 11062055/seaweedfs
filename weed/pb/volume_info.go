@@ -51,6 +51,7 @@ func MaybeLoadVolumeInfo(fileName string) (*volume_server_pb.VolumeInfo, bool, e
 	return volumeInfo, true, nil
 }
 
+/// 写入 .vif 文件中去
 func SaveVolumeInfo(fileName string, volumeInfo *volume_server_pb.VolumeInfo) error {
 
 	if exists, _, canWrite, _, _ := util.CheckFile(fileName); exists && !canWrite {

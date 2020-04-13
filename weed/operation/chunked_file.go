@@ -53,6 +53,7 @@ func (s ChunkList) Len() int           { return len(s) }
 func (s ChunkList) Less(i, j int) bool { return s[i].Offset < s[j].Offset }
 func (s ChunkList) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
+/// 获取文件分块信息
 func LoadChunkManifest(buffer []byte, isGzipped bool) (*ChunkManifest, error) {
 	if isGzipped {
 		var err error
@@ -77,6 +78,7 @@ func (cm *ChunkManifest) DeleteChunks(master string, usePublicUrl bool, grpcDial
 	for _, ci := range cm.Chunks {
 		fileIds = append(fileIds, ci.Fid)
 	}
+	/// 删除一批 fileIds, 从 master 处 获取 具体位置 然后将请求发送到各个 volume server 去
 	results, err := DeleteFiles(master, usePublicUrl, grpcDialOption, fileIds)
 	if err != nil {
 		glog.V(0).Infof("delete %+v: %v", fileIds, err)
@@ -92,6 +94,7 @@ func (cm *ChunkManifest) DeleteChunks(master string, usePublicUrl bool, grpcDial
 	return nil
 }
 
+/// 读取分块数据
 func readChunkNeedle(fileUrl string, w io.Writer, offset int64) (written int64, e error) {
 	req, err := http.NewRequest("GET", fileUrl, nil)
 	if err != nil {
@@ -158,6 +161,7 @@ func (cf *ChunkedFileReader) Seek(offset int64, whence int) (int64, error) {
 	return cf.pos, err
 }
 
+/// 根据 分块 Fid 从 master 处获取资源位置 然后 从响应位置读取分块数据
 func (cf *ChunkedFileReader) WriteTo(w io.Writer) (n int64, err error) {
 	chunkIndex := -1
 	chunkStartOffset := int64(0)
@@ -174,10 +178,12 @@ func (cf *ChunkedFileReader) WriteTo(w io.Writer) (n int64, err error) {
 	for ; chunkIndex < len(cf.chunkList); chunkIndex++ {
 		ci := cf.chunkList[chunkIndex]
 		// if we need read date from local volume server first?
+		/// 获取资源位置
 		fileUrl, lookupError := LookupFileId(cf.master, ci.Fid)
 		if lookupError != nil {
 			return n, lookupError
 		}
+		/// 读取分块数据
 		if wn, e := readChunkNeedle(fileUrl, w, chunkStartOffset); e != nil {
 			return n, e
 		} else {

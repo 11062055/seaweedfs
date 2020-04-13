@@ -37,6 +37,7 @@ type EcVolume struct {
 	ecjFileAccessLock         sync.Mutex
 }
 
+/// 生成一个 ec volume 包含相应的 .ecx .ecj .vif 文件
 func NewEcVolume(dir string, collection string, vid needle.VolumeId) (ev *EcVolume, err error) {
 	ev = &EcVolume{dir: dir, Collection: collection, VolumeId: vid}
 
@@ -71,6 +72,7 @@ func NewEcVolume(dir string, collection string, vid needle.VolumeId) (ev *EcVolu
 	return
 }
 
+/// 增加 Ec Volume Shard
 func (ev *EcVolume) AddEcVolumeShard(ecVolumeShard *EcVolumeShard) bool {
 	for _, s := range ev.Shards {
 		if s.ShardId == ecVolumeShard.ShardId {
@@ -85,6 +87,7 @@ func (ev *EcVolume) AddEcVolumeShard(ecVolumeShard *EcVolumeShard) bool {
 	return true
 }
 
+/// 删除 Ec Volume Shard
 func (ev *EcVolume) DeleteEcVolumeShard(shardId ShardId) (ecVolumeShard *EcVolumeShard, deleted bool) {
 	foundPosition := -1
 	for i, s := range ev.Shards {
@@ -102,6 +105,7 @@ func (ev *EcVolume) DeleteEcVolumeShard(shardId ShardId) (ecVolumeShard *EcVolum
 	return ecVolumeShard, true
 }
 
+/// 查找 Ec Volume Shard
 func (ev *EcVolume) FindEcVolumeShard(shardId ShardId) (ecVolumeShard *EcVolumeShard, found bool) {
 	for _, s := range ev.Shards {
 		if s.ShardId == shardId {
@@ -208,6 +212,7 @@ func (ev *EcVolume) FindNeedleFromEcx(needleId types.NeedleId) (offset types.Off
 	return SearchNeedleFromSortedIndex(ev.ecxFile, ev.ecxFileSize, needleId, nil)
 }
 
+/// 二分查找 .ecx 文件 获取 needle 如果找到则调用 processNeedleFn
 func SearchNeedleFromSortedIndex(ecxFile *os.File, ecxFileSize int64, needleId types.NeedleId, processNeedleFn func(file *os.File, offset int64) error) (offset types.Offset, size uint32, err error) {
 	var key types.NeedleId
 	buf := make([]byte, types.NeedleMapEntrySize)

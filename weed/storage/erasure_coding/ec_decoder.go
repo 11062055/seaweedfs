@@ -14,6 +14,7 @@ import (
 )
 
 // write .idx file from .ecx and .ecj files
+/// 将 .ecx 和 .ecj 文件写入 .idx 文件
 func WriteIdxFileFromEcIndex(baseFileName string) (err error) {
 
 	ecxFile, openErr := os.OpenFile(baseFileName+".ecx", os.O_RDONLY, 0644)
@@ -28,8 +29,10 @@ func WriteIdxFileFromEcIndex(baseFileName string) (err error) {
 	}
 	defer idxFile.Close()
 
+	/// ecx 文件直接拷贝到 idx 文件
 	io.Copy(idxFile, ecxFile)
 
+	/// ecj 文件则遍历写入 idx 文件
 	err = iterateEcjFile(baseFileName, func(key types.NeedleId) error {
 
 		bytes := needle_map.ToBytes(key, types.Offset{}, types.TombstoneFileSize)
@@ -51,6 +54,7 @@ func FindDatFileSize(baseFileName string) (datSize int64, err error) {
 		return 0, fmt.Errorf("read ec volume %s version: %v", baseFileName, err)
 	}
 
+	/// 遍历 ecx file 获取 .dat 文件大小
 	err = iterateEcxFile(baseFileName, func(key types.NeedleId, offset types.Offset, size uint32) error {
 
 		if size == types.TombstoneFileSize {
@@ -87,6 +91,7 @@ func readEcVolumeVersion(baseFileName string) (version needle.Version, err error
 
 }
 
+/// 遍历 .ecx 文件, 并且调用 函数 processNeedleFn
 func iterateEcxFile(baseFileName string, processNeedleFn func(key types.NeedleId, offset types.Offset, size uint32) error) error {
 	ecxFile, openErr := os.OpenFile(baseFileName+".ecx", os.O_RDONLY, 0644)
 	if openErr != nil {
@@ -117,6 +122,7 @@ func iterateEcxFile(baseFileName string, processNeedleFn func(key types.NeedleId
 
 }
 
+/// 遍历 .ecj 文件, 并且调用 函数 processNeedleFn
 func iterateEcjFile(baseFileName string, processNeedleFn func(key types.NeedleId) error) error {
 	ecjFile, openErr := os.OpenFile(baseFileName+".ecj", os.O_RDONLY, 0644)
 	if openErr != nil {
@@ -147,6 +153,7 @@ func iterateEcjFile(baseFileName string, processNeedleFn func(key types.NeedleId
 }
 
 // WriteDatFile generates .dat from from .ec00 ~ .ec09 files
+/// 从 .ec00 ~ .ec13 文件拷贝到 .dat 文件中去
 func WriteDatFile(baseFileName string, datFileSize int64) error {
 
 	datFile, openErr := os.OpenFile(baseFileName+".dat", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
@@ -157,6 +164,7 @@ func WriteDatFile(baseFileName string, datFileSize int64) error {
 
 	inputFiles := make([]*os.File, DataShardsCount)
 
+	/// 读取 .ec00 ~ .ec13
 	for shardId := 0; shardId < DataShardsCount; shardId++ {
 		shardFileName := baseFileName + ToExt(shardId)
 		inputFiles[shardId], openErr = os.OpenFile(shardFileName, os.O_RDONLY, 0)
@@ -166,16 +174,19 @@ func WriteDatFile(baseFileName string, datFileSize int64) error {
 		defer inputFiles[shardId].Close()
 	}
 
+	/// 从 .ec00 ~ .ec13 拷贝到 .dat 文件中去, 处理 大块
 	for datFileSize >= DataShardsCount*ErasureCodingLargeBlockSize {
 		for shardId := 0; shardId < DataShardsCount; shardId++ {
 			w, err := io.CopyN(datFile, inputFiles[shardId], ErasureCodingLargeBlockSize)
 			if w != ErasureCodingLargeBlockSize {
 				return fmt.Errorf("copy %s large block %d: %v", baseFileName, shardId, err)
 			}
+			/// 剩余文件大小减小
 			datFileSize -= ErasureCodingLargeBlockSize
 		}
 	}
 
+	/// 从 .ec00 ~ .ec13 拷贝到 .dat 文件中去, 处理 小块
 	for datFileSize > 0 {
 		for shardId := 0; shardId < DataShardsCount; shardId++ {
 			toRead := min(datFileSize, ErasureCodingSmallBlockSize)

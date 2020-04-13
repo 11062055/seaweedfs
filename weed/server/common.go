@@ -229,6 +229,7 @@ func adjustHeadersAfterHEAD(w http.ResponseWriter, r *http.Request, filename str
 	}
 }
 
+/// 分段 定点 传输 (待细看)
 func processRangeRequest(r *http.Request, w http.ResponseWriter, totalSize int64, mimeType string, writeFn func(writer io.Writer, offset int64, size int64) error) {
 	rangeReq := r.Header.Get("Range")
 
@@ -243,6 +244,7 @@ func processRangeRequest(r *http.Request, w http.ResponseWriter, totalSize int64
 
 	//the rest is dealing with partial content request
 	//mostly copy from src/pkg/net/http/fs.go
+	/// 获取范围 数组 httpRange
 	ranges, err := parseRange(rangeReq, totalSize)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusRequestedRangeNotSatisfiable)
@@ -258,6 +260,7 @@ func processRangeRequest(r *http.Request, w http.ResponseWriter, totalSize int64
 	if len(ranges) == 0 {
 		return
 	}
+	/// 只有一个 范围
 	if len(ranges) == 1 {
 		// RFC 2616, Section 14.16:
 		// "When an HTTP message includes the content of a single

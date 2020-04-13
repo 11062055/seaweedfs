@@ -2915,6 +2915,7 @@ type VolumeServerServer interface {
 	Query(*QueryRequest, VolumeServer_QueryServer) error
 }
 
+/// 注册 volume server 的 grpc
 func RegisterVolumeServerServer(s *grpc.Server, srv VolumeServerServer) {
 	s.RegisterService(&_VolumeServer_serviceDesc, srv)
 }
@@ -3537,6 +3538,7 @@ func (x *volumeServerQueryServer) Send(m *QueriedStripe) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+/// volume server 的 grpc
 var _VolumeServer_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "volume_server_pb.VolumeServer",
 	HandlerType: (*VolumeServerServer)(nil),

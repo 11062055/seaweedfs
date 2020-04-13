@@ -74,6 +74,7 @@ func LoadConfiguration(config *viper.Viper) {
 }
 
 // used by volume server to receive remote storage configurations from master
+/// volume server 用于 从 master 处接收 远端的配置
 func LoadFromPbStorageBackends(storageBackends []*master_pb.StorageBackend) {
 
 	for _, storageBackend := range storageBackends {

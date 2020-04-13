@@ -116,6 +116,7 @@ func (l *DiskLocation) concurrentLoadingVolumes(needleMapKind NeedleMapType, con
 
 }
 
+/// 并行读取目录 下的 所有 volume 信息
 func (l *DiskLocation) loadExistingVolumes(needleMapKind NeedleMapType) {
 
 	l.concurrentLoadingVolumes(needleMapKind, 10)

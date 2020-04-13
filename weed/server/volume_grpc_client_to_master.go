@@ -63,6 +63,7 @@ func (vs *VolumeServer) doHeartbeat(masterNode, masterGrpcAddress string, grpcDi
 	defer grpcConection.Close()
 
 	client := master_pb.NewSeaweedClient(grpcConection)
+	/// 获取 seaweedSendHeartbeatClient
 	stream, err := client.SendHeartbeat(context.Background())
 	if err != nil {
 		glog.V(0).Infof("SendHeartbeat to %s: %v", masterNode, err)
@@ -73,6 +74,7 @@ func (vs *VolumeServer) doHeartbeat(masterNode, masterGrpcAddress string, grpcDi
 
 	doneChan := make(chan error, 1)
 
+	/// 这里是从 master 接收 响应, 以接收更改的参数
 	go func() {
 		for {
 			in, err := stream.Recv()
@@ -82,12 +84,15 @@ func (vs *VolumeServer) doHeartbeat(masterNode, masterGrpcAddress string, grpcDi
 			}
 			if in.GetVolumeSizeLimit() != 0 && vs.store.GetVolumeSizeLimit() != in.GetVolumeSizeLimit() {
 				vs.store.SetVolumeSizeLimit(in.GetVolumeSizeLimit())
+				/// 如果有调整 调整完成 后也需要向 master 报告
 				if vs.store.MaybeAdjustVolumeMax() {
 					if err = stream.Send(vs.store.CollectHeartbeat()); err != nil {
 						glog.V(0).Infof("Volume Server Failed to talk with master %s: %v", masterNode, err)
 					}
 				}
 			}
+			/// 如果不是 leader master 就退出, 也就是说只向 leader master 发送信息
+			/// 如果 master 改变了怎么办, 各个 master 之间数据一致性怎么保证
 			if in.GetLeader() != "" && masterNode != in.GetLeader() && !isSameIP(in.GetLeader(), masterNode) {
 				glog.V(0).Infof("Volume Server found a new master newLeader: %v instead of %v", in.GetLeader(), masterNode)
 				newLeader = in.GetLeader()
@@ -104,6 +109,8 @@ func (vs *VolumeServer) doHeartbeat(masterNode, masterGrpcAddress string, grpcDi
 		}
 	}()
 
+	/// 然后发送 心跳 数据包
+	/// CollectHeartbeat中还有个功能就是回收本地过期的 volume
 	if err = stream.Send(vs.store.CollectHeartbeat()); err != nil {
 		glog.V(0).Infof("Volume Server Failed to talk with master %s: %v", masterNode, err)
 		return "", err
@@ -119,6 +126,7 @@ func (vs *VolumeServer) doHeartbeat(masterNode, masterGrpcAddress string, grpcDi
 
 	for {
 		select {
+		/// 增加卷 和 启动时挂载卷 的时候会向该 channel 中写入信息
 		case volumeMessage := <-vs.store.NewVolumesChan:
 			deltaBeat := &master_pb.Heartbeat{
 				NewVolumes: []*master_pb.VolumeShortInformationMessage{
@@ -142,6 +150,7 @@ func (vs *VolumeServer) doHeartbeat(masterNode, masterGrpcAddress string, grpcDi
 				glog.V(0).Infof("Volume Server Failed to update to master %s: %v", masterNode, err)
 				return "", err
 			}
+		/// 解挂 和 删除 卷 的时候 会向该 通道 发送消息
 		case volumeMessage := <-vs.store.DeletedVolumesChan:
 			deltaBeat := &master_pb.Heartbeat{
 				DeletedVolumes: []*master_pb.VolumeShortInformationMessage{
@@ -165,6 +174,7 @@ func (vs *VolumeServer) doHeartbeat(masterNode, masterGrpcAddress string, grpcDi
 				glog.V(0).Infof("Volume Server Failed to update to master %s: %v", masterNode, err)
 				return "", err
 			}
+		/// 间隔 发送 心跳 信息
 		case <-volumeTickChan:
 			glog.V(4).Infof("volume server %s:%d heartbeat", vs.store.Ip, vs.store.Port)
 			if err = stream.Send(vs.store.CollectHeartbeat()); err != nil {

@@ -24,16 +24,22 @@ security settings:
 
 */
 
+/// 用于处理内部后端请求 包括 volume 及其 副本的 增 删 查, 图片的 缩放扩大等, 若非本地则返回 跳转
 func (vs *VolumeServer) privateStoreHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET", "HEAD":
 		stats.ReadRequest()
+		/// 从 DiskLocation 中查找是否 有 volume, 然后从缓存中查找位置, 没有的话发送请求进行 跳转
+		/// 如果是本地的 则进行 cookie 和过去时间处理,
+		/// 之后 处理 分块 定点 传输 和 图片 大小 更改, 如果 需要 会根据 分块 id 从 master 处获取 资源位置 然后 到相应服务器 分块 读取 资源
 		vs.GetOrHeadHandler(w, r)
 	case "DELETE":
 		stats.DeleteRequest()
+		/// 删除 volume 包括 副本 本地数据 和远端数据
 		vs.guard.WhiteList(vs.DeleteHandler)(w, r)
 	case "PUT", "POST":
 		stats.WriteRequest()
+		/// 上传数据 包括写本地和远端副本
 		vs.guard.WhiteList(vs.PostHandler)(w, r)
 	}
 }
@@ -42,6 +48,9 @@ func (vs *VolumeServer) publicReadOnlyHandler(w http.ResponseWriter, r *http.Req
 	switch r.Method {
 	case "GET":
 		stats.ReadRequest()
+		/// 从 DiskLocation 中查找是否 有 volume, 然后从缓存中查找位置, 没有的话发送请求进行 跳转
+		/// 如果是本地的 则进行 cookie 和过去时间处理,
+		/// 之后 处理 分块 定点 传输 和 图片 大小 更改, 如果 需要 会根据 分块 id 从 master 处获取 资源位置 然后 到相应服务器 分块 读取 资源
 		vs.GetOrHeadHandler(w, r)
 	case "HEAD":
 		stats.ReadRequest()

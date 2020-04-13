@@ -13,6 +13,7 @@ var signalChan chan os.Signal
 var hooks = make([]func(), 0)
 var hookLock sync.Mutex
 
+/// 中断信号 调用 注册 的 回调函数
 func init() {
 	signalChan = make(chan os.Signal, 1)
 	signal.Ignore(syscall.SIGHUP)

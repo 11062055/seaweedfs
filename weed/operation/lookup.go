@@ -33,6 +33,8 @@ var (
 	vc VidCache // caching of volume locations, re-check if after 10 minutes
 )
 
+/// 查找 volume 有缓存则用缓存 没有缓存则向 server (是master) 发送请求
+/// Volume Server 的 GetOrHeadHandler 中会调用, 当 本地 查不到时 进行 redirect 是调用
 func Lookup(server string, vid string) (ret *LookupResult, err error) {
 	locations, cache_err := vc.Get(vid)
 	if cache_err != nil {
@@ -45,6 +47,7 @@ func Lookup(server string, vid string) (ret *LookupResult, err error) {
 	return
 }
 
+/// 向 master server 发送请求 进行查找
 func do_lookup(server string, vid string) (*LookupResult, error) {
 	values := make(url.Values)
 	values.Add("volumeId", vid)
@@ -79,6 +82,7 @@ func LookupFileId(server string, fileId string) (fullUrl string, err error) {
 }
 
 // LookupVolumeIds find volume locations by cache and actual lookup
+/// 从 master 处 查询一批 volume id 的位置
 func LookupVolumeIds(server string, grpcDialOption grpc.DialOption, vids []string) (map[string]LookupResult, error) {
 	ret := make(map[string]LookupResult)
 	var unknown_vids []string
