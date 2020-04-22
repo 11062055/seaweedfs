@@ -27,6 +27,7 @@ type ChunkCacheVolume struct {
 	fileSize    int64
 }
 
+/// 本地 磁盘 缓存, leveldb 中存储 .idx 文件中的索引数据, 而 .dat 文件中存储实际数据
 func LoadOrCreateChunkCacheVolume(fileName string, preallocate int64) (*ChunkCacheVolume, error) {
 
 	v := &ChunkCacheVolume{
@@ -47,11 +48,13 @@ func LoadOrCreateChunkCacheVolume(fileName string, preallocate int64) (*ChunkCac
 		if dataFile, err := os.OpenFile(v.fileName+".dat", os.O_RDWR|os.O_CREATE, 0644); err != nil {
 			return nil, fmt.Errorf("cannot create cache file %s.dat: %v", v.fileName, err)
 		} else {
+			/// 磁盘文件 当作 缓存
 			v.DataBackend = backend.NewDiskFile(dataFile)
 			v.lastModTime = modTime
 			v.fileSize = fileSize
 		}
 	} else {
+		/// 创建文件, 同时调用 NewDiskFile 使用 磁盘文件 当作 缓存
 		if v.DataBackend, err = backend.CreateVolumeFile(v.fileName+".dat", preallocate, 0); err != nil {
 			return nil, fmt.Errorf("cannot create cache file %s.dat: %v", v.fileName, err)
 		}
@@ -69,6 +72,7 @@ func LoadOrCreateChunkCacheVolume(fileName string, preallocate int64) (*ChunkCac
 		WriteBuffer:                   1 * 1024 * 1024, // default value is 4MiB
 		CompactionTableSizeMultiplier: 10,              // default value is 1
 	}
+	/// 将 .idx 文件中的数据 更新到 leveldb 中去
 	if v.nm, err = storage.NewLevelDbNeedleMap(v.fileName+".ldb", indexFile, opts); err != nil {
 		return nil, fmt.Errorf("loading leveldb %s error: %v", v.fileName+".ldb", err)
 	}
@@ -100,6 +104,7 @@ func (v *ChunkCacheVolume) Reset() (*ChunkCacheVolume, error) {
 	return LoadOrCreateChunkCacheVolume(v.fileName, v.sizeLimit)
 }
 
+/// 获取一个 needle 文件数据, 首先从 leveldb(.idx文件同步过去的) 中获取 在 .dat 文件中的偏移量和数据大小, 然后去 .dat 文件中读取
 func (v *ChunkCacheVolume) GetNeedle(key types.NeedleId) ([]byte, error) {
 
 	nv, ok := v.nm.Get(key)
@@ -119,6 +124,7 @@ func (v *ChunkCacheVolume) GetNeedle(key types.NeedleId) ([]byte, error) {
 	return data, nil
 }
 
+/// 写入一个 needle 文件数据, 往 .dat 文件中写入数据 和 必要的 填充数据, 然后将索引数据写入 leveldb 中去
 func (v *ChunkCacheVolume) WriteNeedle(key types.NeedleId, data []byte) error {
 
 	offset := v.fileSize

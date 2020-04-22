@@ -188,10 +188,12 @@ func runServer(cmd *Command, args []string) bool {
 	}
 
 	// start volume server
+	/// 开始 volume server, 会 递归 加载 目录 下的 volume 信息, 会 注册 GRPC server, 开启 后台管理 接口, 向 master 同步心跳信息
 	{
 		go serverOptions.v.startVolumeServer(*volumeDataFolders, *volumeMaxDataVolumeCounts, *serverWhiteListOption)
 	}
 
+	/// 开始 master, 注册 raft server, 注册 grpc server, master 之间 开始 相互 通信, 接收 volume server 信息, 建立 并 更新 拓扑结构
 	startMaster(masterOptions, serverWhiteList)
 
 	return true

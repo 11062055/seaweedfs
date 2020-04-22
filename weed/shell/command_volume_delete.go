@@ -28,6 +28,7 @@ func (c *commandVolumeDelete) Help() string {
 `
 }
 
+/// 删除 volume
 func (c *commandVolumeDelete) Do(args []string, commandEnv *CommandEnv, writer io.Writer) (err error) {
 
 	if len(args) != 2 {

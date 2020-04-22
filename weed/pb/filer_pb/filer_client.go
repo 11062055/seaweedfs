@@ -56,6 +56,7 @@ func GetEntry(filerClient FilerClient, fullFilePath util.FullPath) (entry *Entry
 	return
 }
 
+/// 列出 目录下 的 所有 文件
 func ReadDirAllEntries(filerClient FilerClient, fullDirPath util.FullPath, prefix string, fn func(entry *Entry, isLast bool)) (err error) {
 
 	return doList(filerClient, fullDirPath, prefix, fn, "", false, math.MaxUint32)
@@ -68,6 +69,7 @@ func List(filerClient FilerClient, parentDirectoryPath, prefix string, fn func(e
 
 }
 
+/// 列出 目录下 的 所有 文件
 func doList(filerClient FilerClient, fullDirPath util.FullPath, prefix string, fn func(entry *Entry, isLast bool), startFrom string, inclusive bool, limit uint32) (err error) {
 
 	err = filerClient.WithFilerClient(func(client SeaweedFilerClient) error {
@@ -81,6 +83,7 @@ func doList(filerClient FilerClient, fullDirPath util.FullPath, prefix string, f
 		}
 
 		glog.V(3).Infof("read directory: %v", request)
+		/// 列出 目录下 的 所有 文件
 		stream, err := client.ListEntries(context.Background(), request)
 		if err != nil {
 			return fmt.Errorf("list %s: %v", fullDirPath, err)

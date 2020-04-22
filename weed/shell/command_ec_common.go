@@ -100,6 +100,7 @@ func oneServerCopyAndMountEcShardsFromSource(grpcDialOption grpc.DialOption,
 	return
 }
 
+/// 遍历所有 data center \ rack \ data node
 func eachDataNode(topo *master_pb.TopologyInfo, fn func(dc string, rack RackId, dn *master_pb.DataNodeInfo)) {
 	for _, dc := range topo.DataCenterInfos {
 		for _, rack := range dc.RackInfos {

@@ -14,6 +14,7 @@ type NeedleMap struct {
 	m needle_map.NeedleValueMap
 }
 
+/// 内存 型 的 needle map
 func NewCompactNeedleMap(file *os.File) *NeedleMap {
 	nm := &NeedleMap{
 		m: needle_map.NewCompactMap(),

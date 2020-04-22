@@ -10,6 +10,7 @@ import (
 	"github.com/willf/bloom"
 )
 
+/// needle map 的 本地 metrics
 type mapMetric struct {
 	DeletionCounter     uint32 `json:"DeletionCounter"`
 	FileCounter         uint32 `json:"FileCounter"`
@@ -91,10 +92,12 @@ func (mm *mapMetric) MaybeSetMaxFileKey(key NeedleId) {
 	}
 }
 
+/// 将 .idx 中的文件 的相关 数据 遍历 到 metric 中去
 func newNeedleMapMetricFromIndexFile(r *os.File) (mm *mapMetric, err error) {
 	mm = &mapMetric{}
 	var bf *bloom.BloomFilter
 	buf := make([]byte, NeedleIdSize)
+	/// 遍历 .idx 文件, 并且针对每条 数据 调用 函数 fn
 	err = reverseWalkIndexFile(r, func(entryCount int64) {
 		bf = bloom.NewWithEstimates(uint(entryCount), 0.001)
 	}, func(key NeedleId, offset Offset, size uint32) error {
@@ -121,6 +124,7 @@ func newNeedleMapMetricFromIndexFile(r *os.File) (mm *mapMetric, err error) {
 	return
 }
 
+/// 遍历 .idx 文件, 并且针对每条 数据 调用 函数 fn
 func reverseWalkIndexFile(r *os.File, initFn func(entryCount int64), fn func(key NeedleId, offset Offset, size uint32) error) error {
 	fi, err := r.Stat()
 	if err != nil {

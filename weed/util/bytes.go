@@ -8,6 +8,7 @@ import (
 
 // big endian
 
+/// 字节 转 为 uint64 型整数
 func BytesToUint64(b []byte) (v uint64) {
 	length := uint(len(b))
 	for i := uint(0); i < length-1; i++ {

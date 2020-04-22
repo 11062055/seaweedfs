@@ -22,10 +22,15 @@ func loadVolumeWithoutIndex(dirname string, collection string, id needle.VolumeI
 	return
 }
 
+/// 从 .vif 文件中 解析 得到 VolumeInfo
+/// 从 .dat 文件中 加载 得到 数据
+/// 从 .dat 文件中读取超级块 信息
+/// 从 .idx 文件中 获取 索引信息
 func (v *Volume) load(alsoLoadIndex bool, createDatIfMissing bool, needleMapKind NeedleMapType, preallocate int64) (err error) {
 	fileName := v.FileName()
 	alreadyHasSuperBlock := false
 
+	/// 将文件 .vif 中的 数据 读出来 并且 解析为 VolumeInfo
 	hasVolumeInfoFile := v.maybeLoadVolumeInfo() && v.volumeInfo.Version != 0
 
 	if v.HasRemoteFile() {
@@ -34,6 +39,7 @@ func (v *Volume) load(alsoLoadIndex bool, createDatIfMissing bool, needleMapKind
 		glog.V(0).Infof("loading volume %d from remote %v", v.Id, v.volumeInfo.Files)
 		v.LoadRemoteFile()
 		alreadyHasSuperBlock = true
+	/// 加载 本地 的 .dat 文件
 	} else if exists, canRead, canWrite, modifiedTime, fileSize := util.CheckFile(fileName + ".dat"); exists {
 		// open dat file
 		if !canRead {
@@ -51,6 +57,7 @@ func (v *Volume) load(alsoLoadIndex bool, createDatIfMissing bool, needleMapKind
 		if fileSize >= super_block.SuperBlockSize {
 			alreadyHasSuperBlock = true
 		}
+		/// back end 实际是 本地 的 .dat 文件
 		v.DataBackend = backend.NewDiskFile(dataFile)
 	} else {
 		if createDatIfMissing {
@@ -69,6 +76,7 @@ func (v *Volume) load(alsoLoadIndex bool, createDatIfMissing bool, needleMapKind
 	}
 
 	if alreadyHasSuperBlock {
+		/// 从 backend 文件中读取超级块 信息, 实际可能是 上面生成的 .dat 文件
 		err = v.readSuperBlock()
 	} else {
 		if !v.SuperBlock.Initialized() {
@@ -76,6 +84,7 @@ func (v *Volume) load(alsoLoadIndex bool, createDatIfMissing bool, needleMapKind
 		}
 		err = v.maybeWriteSuperBlock()
 	}
+	/// 读取 .idx 文件
 	if err == nil && alsoLoadIndex {
 		var indexFile *os.File
 		if v.noWriteOrDelete {
@@ -95,6 +104,8 @@ func (v *Volume) load(alsoLoadIndex bool, createDatIfMissing bool, needleMapKind
 		}
 
 		if v.IsReadOnly() {
+			/// 将 idx 文件中的 数据首先读入 leveldb 中 , 然后按序读出 并且写入 .sdx 文件中去
+			/// 将 .idx 中的文件 的相关 数据 遍历 到 metric 中去
 			if v.nm, err = NewSortedFileNeedleMap(fileName, indexFile); err != nil {
 				glog.V(0).Infof("loading sorted db %s error: %v", fileName+".sdx", err)
 			}

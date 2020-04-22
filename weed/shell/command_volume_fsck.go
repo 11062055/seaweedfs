@@ -46,6 +46,12 @@ func (c *commandVolumeFsck) Help() string {
 `
 }
 
+/// type CommandEnv struct {
+///	    env          map[string]string
+///	    MasterClient *wdclient.MasterClient
+///	    option       ShellOptions
+/// }
+
 func (c *commandVolumeFsck) Do(args []string, commandEnv *CommandEnv, writer io.Writer) (err error) {
 
 	fsckCommand := flag.NewFlagSet(c.Name(), flag.ContinueOnError)
@@ -68,6 +74,7 @@ func (c *commandVolumeFsck) Do(args []string, commandEnv *CommandEnv, writer io.
 	defer os.RemoveAll(tempFolder)
 
 	// collect all volume id locations
+	/// 从 master 获取 (ec)volume id 到 volume info 的 map
 	volumeIdToVInfo, err := c.collectVolumeIds(*verbose, writer)
 	if err != nil {
 		return fmt.Errorf("failed to collect all volume locations: %v", err)
@@ -75,6 +82,7 @@ func (c *commandVolumeFsck) Do(args []string, commandEnv *CommandEnv, writer io.
 
 	// collect each volume file ids
 	for volumeId, vinfo := range volumeIdToVInfo {
+		/// 从 各个 volume server 拷贝文件 .idx 或者 .ecx 到本地 临时目录
 		err = c.collectOneVolumeFileIds(tempFolder, volumeId, vinfo, *verbose, writer)
 		if err != nil {
 			return fmt.Errorf("failed to collect file ids from volume %d on %s: %v", volumeId, vinfo.server, err)
@@ -82,6 +90,7 @@ func (c *commandVolumeFsck) Do(args []string, commandEnv *CommandEnv, writer io.
 	}
 
 	// collect all filer file ids
+	/// BFS 遍历 远端 master 的 所有 目录 将 vid 和 fileKey 从 远端 master 上 读取 出来 并且 写入 本地 目录下
 	if err = c.collectFilerFileIds(tempFolder, volumeIdToVInfo, *verbose, writer); err != nil {
 		return fmt.Errorf("failed to collect file ids from filer: %v", err)
 	}
@@ -89,6 +98,7 @@ func (c *commandVolumeFsck) Do(args []string, commandEnv *CommandEnv, writer io.
 	// volume file ids substract filer file ids
 	var totalInUseCount, totalOrphanChunkCount, totalOrphanDataSize uint64
 	for volumeId, vinfo := range volumeIdToVInfo {
+		/// 从 各个 volume 中拿到的数据, 减去 从 master 获取到的 数据(在用的), 就是 没 用的, 或者是 孤儿 数据
 		inUseCount, orphanFileIds, orphanDataSize, checkErr := c.oneVolumeFileIdsSubtractFilerFileIds(tempFolder, volumeId, writer, *verbose)
 		if checkErr != nil {
 			return fmt.Errorf("failed to collect file ids from volume %d on %s: %v", volumeId, vinfo.server, checkErr)
@@ -101,6 +111,7 @@ func (c *commandVolumeFsck) Do(args []string, commandEnv *CommandEnv, writer io.
 			if vinfo.isEcVolume {
 				fmt.Fprintf(writer, "Skip purging for Erasure Coded volumes.\n")
 			}
+			/// 从 master 处 获取 一个 volume 的 所有 location, 并在 对应 location 上删除 所有 孤儿文件
 			if err = c.purgeFileIdsForOneVolume(volumeId, orphanFileIds, writer); err != nil {
 				return fmt.Errorf("purge for volume %d: %v\n", volumeId, err)
 			}
@@ -123,6 +134,7 @@ func (c *commandVolumeFsck) Do(args []string, commandEnv *CommandEnv, writer io.
 	return nil
 }
 
+/// 拷贝文件 .idx 或者 .ecx 到本地 临时目录
 func (c *commandVolumeFsck) collectOneVolumeFileIds(tempFolder string, volumeId uint32, vinfo VInfo, verbose bool, writer io.Writer) error {
 
 	if verbose {
@@ -136,6 +148,7 @@ func (c *commandVolumeFsck) collectOneVolumeFileIds(tempFolder string, volumeId 
 			ext = ".ecx"
 		}
 
+		/// 拷贝文件 .idx 或者 .ecx 到本地 临时目录
 		copyFileClient, err := volumeServerClient.CopyFile(context.Background(), &volume_server_pb.CopyFileRequest{
 			VolumeId:                 volumeId,
 			Ext:                      ext,
@@ -160,12 +173,14 @@ func (c *commandVolumeFsck) collectOneVolumeFileIds(tempFolder string, volumeId 
 
 }
 
+/// BFS 遍历 远端 master 的 所有 目录 将 vid 和 fileKey 从 远端 master 上 读取 出来 并且 写入 本地 目录下
 func (c *commandVolumeFsck) collectFilerFileIds(tempFolder string, volumeIdToServer map[uint32]VInfo, verbose bool, writer io.Writer) error {
 
 	if verbose {
 		fmt.Fprintf(writer, "collecting file ids from filer ...\n")
 	}
 
+	/// volume id 到本地临时 目录 的映射
 	files := make(map[uint32]*os.File)
 	for vid := range volumeIdToServer {
 		dst, openErr := os.OpenFile(getFilerFileIdFile(tempFolder, vid), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
@@ -184,6 +199,10 @@ func (c *commandVolumeFsck) collectFilerFileIds(tempFolder string, volumeIdToSer
 		vid     uint32
 		fileKey uint64
 	}
+	/// 以 BFS 方式 列出 目录下 的 所有 文件, 并 调用 函数 , 如果 目录下的文件 还是 目录 则将 子目录 入队列
+	/// 实际调用的远程调用是 ReadDirAllEntries 列出所有目录下的文件或者子目录, 也就是 Entry
+	/// 第二个函数 负责 从 接收到的 数据 生成 待写入本地的数据, 并且传进 channel
+	/// 第一个函数 负责 从 channel 中读 出数据 并且写入本地 文件 dst
 	return doTraverseBfsAndSaving(c.env, nil, "/", false, func(outputChan chan interface{}) {
 		buffer := make([]byte, 8)
 		for item := range outputChan {
@@ -204,13 +223,17 @@ func (c *commandVolumeFsck) collectFilerFileIds(tempFolder string, volumeIdToSer
 
 func (c *commandVolumeFsck) oneVolumeFileIdsSubtractFilerFileIds(tempFolder string, volumeId uint32, writer io.Writer, verbose bool) (inUseCount uint64, orphanFileIds []string, orphanDataSize uint64, err error) {
 
+	/// 生成 level db
 	db := needle_map.NewMemDb()
 	defer db.Close()
 
+	/// 将 本地保存 的 从 各个 volume 下载的 .idx 文件中的 数据 load 到 leveldb 中
 	if err = db.LoadFromIdx(getVolumeFileIdFile(tempFolder, volumeId)); err != nil {
 		return
 	}
 
+	/// 将 通过 doTraverseBfsAndSaving 从远端 master 上下载的 .fid 文件读出来
+	/// 远端 master 中的数据表示在用的
 	filerFileIdsData, err := ioutil.ReadFile(getFilerFileIdFile(tempFolder, volumeId))
 	if err != nil {
 		return
@@ -221,12 +244,15 @@ func (c *commandVolumeFsck) oneVolumeFileIdsSubtractFilerFileIds(tempFolder stri
 		return 0, nil, 0, fmt.Errorf("filer data is corrupted")
 	}
 
+	/// 将 level db 中的 数据 减去 从 .fid 中读 出来的数据
+	/// 正在 使用 的 数目 递增
 	for i := 0; i < len(filerFileIdsData); i += 8 {
 		fileKey := util.BytesToUint64(filerFileIdsData[i : i+8])
 		db.Delete(types.NeedleId(fileKey))
 		inUseCount++
 	}
 
+	/// leveldb 中 剩余的 从 各个 volume 下载的 .idx 文件中的 数据 就是 孤儿 文件, 也就是没有使用的
 	var orphanFileCount uint64
 	db.AscendingVisit(func(n needle_map.NeedleValue) error {
 		// fmt.Printf("%d,%x\n", volumeId, n.Key)
@@ -252,6 +278,7 @@ type VInfo struct {
 	isEcVolume bool
 }
 
+/// 获取 (ec)volume id 到 volume info 的 map
 func (c *commandVolumeFsck) collectVolumeIds(verbose bool, writer io.Writer) (volumeIdToServer map[uint32]VInfo, err error) {
 
 	if verbose {
@@ -260,6 +287,7 @@ func (c *commandVolumeFsck) collectVolumeIds(verbose bool, writer io.Writer) (vo
 
 	volumeIdToServer = make(map[uint32]VInfo)
 	var resp *master_pb.VolumeListResponse
+	/// 获取 所有 volume 的 list
 	err = c.env.MasterClient.WithClient(func(client master_pb.SeaweedClient) error {
 		resp, err = client.VolumeList(context.Background(), &master_pb.VolumeListRequest{})
 		return err
@@ -268,6 +296,7 @@ func (c *commandVolumeFsck) collectVolumeIds(verbose bool, writer io.Writer) (vo
 		return
 	}
 
+	/// 获取 (ec)volume id 到 volume info 的 map
 	eachDataNode(resp.TopologyInfo, func(dc string, rack RackId, t *master_pb.DataNodeInfo) {
 		for _, vi := range t.VolumeInfos {
 			volumeIdToServer[vi.Id] = VInfo{
@@ -291,8 +320,10 @@ func (c *commandVolumeFsck) collectVolumeIds(verbose bool, writer io.Writer) (vo
 	return
 }
 
+/// 从 master 处 获取 一个 volume 的 所有 location, 并在 对应 location 上删除 所有 volume id
 func (c *commandVolumeFsck) purgeFileIdsForOneVolume(volumeId uint32, fileIds []string, writer io.Writer) (err error) {
 	fmt.Fprintf(writer, "purging orphan data for volume %d...\n", volumeId)
+	/// 从 master 处 获取 一个 volume 的 所有 location
 	locations, found := c.env.MasterClient.GetLocations(volumeId)
 	if !found {
 		return fmt.Errorf("failed to find volume %d locations", volumeId)
@@ -305,6 +336,7 @@ func (c *commandVolumeFsck) purgeFileIdsForOneVolume(volumeId uint32, fileIds []
 		go func(server string, fidList []string) {
 			defer wg.Done()
 
+			/// 批量删除一台机器上面的 volume id
 			if deleteResults, deleteErr := operation.DeleteFilesAtOneVolumeServer(server, c.env.option.GrpcDialOption, fidList, false); deleteErr != nil {
 				err = deleteErr
 			} else if deleteResults != nil {

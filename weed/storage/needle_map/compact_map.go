@@ -25,6 +25,7 @@ type SectionalNeedleValueExtra struct {
 	OffsetHigher OffsetHigher
 }
 
+/// 每一个 片段 都是 一个 SectionalNeedleValue 数组, 包含 start 和 end 分别为 该片段 最小 和 最大 的 SectionalNeedleValue
 type CompactSection struct {
 	sync.RWMutex
 	values        []SectionalNeedleValue
@@ -39,6 +40,7 @@ type CompactSection struct {
 type Overflow []SectionalNeedleValue
 type OverflowExtra []SectionalNeedleValueExtra
 
+/// 生成 一个片段, 该片段 可包含 10 万个 key
 func NewCompactSection(start NeedleId) *CompactSection {
 	return &CompactSection{
 		values:        make([]SectionalNeedleValue, batch),
@@ -56,6 +58,7 @@ func (cs *CompactSection) Set(key NeedleId, offset Offset, size uint32) (oldOffs
 		cs.end = key
 	}
 	skey := SectionalNeedleId(key - cs.start)
+	/// 即找到 大于 等于 key 的 最小 的 i
 	if i := cs.binarySearchValues(skey); i >= 0 {
 		oldOffset.OffsetHigher, oldOffset.OffsetLower, oldSize = cs.valuesExtra[i].OffsetHigher, cs.values[i].OffsetLower, cs.values[i].Size
 		//println("key", key, "old size", ret)
@@ -158,6 +161,8 @@ func (cs *CompactSection) Get(key NeedleId) (*NeedleValue, bool) {
 	cs.RUnlock()
 	return nil, false
 }
+/// Search uses binary search to find and return the smallest index i in [0, n) at which f(i) is true
+/// 即找到 大于 等于 key 的 最小 的 i
 func (cs *CompactSection) binarySearchValues(key SectionalNeedleId) int {
 	x := sort.Search(cs.counter, func(i int) bool {
 		return cs.values[i].Key >= key
@@ -218,6 +223,7 @@ func (cm *CompactMap) Get(key NeedleId) (*NeedleValue, bool) {
 	}
 	return cm.list[x].Get(key)
 }
+/// 分区间 二分查找
 func (cm *CompactMap) binarySearchCompactSection(key NeedleId) int {
 	l, h := 0, len(cm.list)-1
 	if h < 0 {

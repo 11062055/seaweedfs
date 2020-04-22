@@ -51,10 +51,12 @@ func runDownload(cmd *Command, args []string) bool {
 }
 
 func downloadToFile(server, fileId, saveDir string) error {
+	/// 向 master 发起请求 查询 得到 文件 的 url
 	fileUrl, lookupError := operation.LookupFileId(server, fileId)
 	if lookupError != nil {
 		return lookupError
 	}
+	/// 下载文件
 	filename, _, rc, err := util.DownloadFile(fileUrl)
 	if err != nil {
 		return err
@@ -69,20 +71,25 @@ func downloadToFile(server, fileId, saveDir string) error {
 		isFileList = true
 		filename = filename[0 : len(filename)-len("-list")]
 	}
+	/// 创建 本地 文件
 	f, err := os.OpenFile(path.Join(saveDir, filename), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
 	if err != nil {
 		io.Copy(ioutil.Discard, rc)
 		return err
 	}
 	defer f.Close()
+	/// 响应 包体 是 文件 列表
 	if isFileList {
+		/// 读取 所有 文件
 		content, err := ioutil.ReadAll(rc)
 		if err != nil {
 			return err
 		}
+		/// 得到 所有 的 file id
 		fids := strings.Split(string(content), "\n")
 		for _, partId := range fids {
 			var n int
+			/// 根据 文件 id 获取内容
 			_, part, err := fetchContent(*d.server, partId)
 			if err == nil {
 				n, err = f.Write(part)
@@ -94,6 +101,7 @@ func downloadToFile(server, fileId, saveDir string) error {
 				return err
 			}
 		}
+	/// 得到 的是 文件 内容
 	} else {
 		if _, err = io.Copy(f, rc); err != nil {
 			return err

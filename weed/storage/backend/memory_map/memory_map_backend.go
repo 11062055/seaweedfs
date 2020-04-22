@@ -9,6 +9,7 @@ var (
 // _ backend.BackendStorageFile = &MemoryMappedFile{} // remove this to break import cycle
 )
 
+/// 内存映射 相关 目前 只有 windows 有相关逻辑
 type MemoryMappedFile struct {
 	mm *MemoryMap
 }

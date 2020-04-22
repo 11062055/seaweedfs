@@ -10,6 +10,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/storage/needle"
 )
 
+/// 读取 某一 纳秒 后的所有数据 即增量读取
 func (vs *VolumeServer) VolumeIncrementalCopy(req *volume_server_pb.VolumeIncrementalCopyRequest, stream volume_server_pb.VolumeServer_VolumeIncrementalCopyServer) error {
 
 	v := vs.store.GetVolume(needle.VolumeId(req.VolumeId))
@@ -18,6 +19,7 @@ func (vs *VolumeServer) VolumeIncrementalCopy(req *volume_server_pb.VolumeIncrem
 	}
 
 	stopOffset, _, _ := v.FileStat()
+	/// 从 sinceNs 纳秒 处 开始, 通过 index file 读取 1 个 needle 在 volume 的 offset
 	foundOffset, isLastOne, err := v.BinarySearchByAppendAtNs(req.SinceNs)
 	if err != nil {
 		return fmt.Errorf("fail to locate by appendAtNs %d: %s", req.SinceNs, err)
@@ -30,6 +32,7 @@ func (vs *VolumeServer) VolumeIncrementalCopy(req *volume_server_pb.VolumeIncrem
 	startOffset := foundOffset.ToAcutalOffset()
 
 	buf := make([]byte, 1024*1024*2)
+	/// 从 既定 偏移量 处 开始读取 数据 每次读取buf大小的数据 并且发送
 	return sendFileContent(v.DataBackend, buf, startOffset, int64(stopOffset), stream)
 
 }
@@ -47,6 +50,7 @@ func (vs *VolumeServer) VolumeSyncStatus(ctx context.Context, req *volume_server
 
 }
 
+/// 从 既定 偏移量 处 开始读取 数据 每次读取buf大小的数据 并且发送
 func sendFileContent(datBackend backend.BackendStorageFile, buf []byte, startOffset, stopOffset int64, stream volume_server_pb.VolumeServer_VolumeIncrementalCopyServer) error {
 	var blockSizeLimit = int64(len(buf))
 	for i := int64(0); i < stopOffset-startOffset; i += blockSizeLimit {

@@ -56,6 +56,7 @@ func NewVolumeInfoFromShort(m *master_pb.VolumeShortInformationMessage) (vi Volu
 		Collection: m.Collection,
 		Version:    needle.Version(m.Version),
 	}
+	/// 解析副本
 	rp, e := super_block.NewReplicaPlacementFromByte(byte(m.ReplicaPlacement))
 	if e != nil {
 		return vi, e

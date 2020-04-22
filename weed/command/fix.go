@@ -57,6 +57,7 @@ func (scanner *VolumeFileScanner4Fix) VisitNeedle(n *needle.Needle, offset int64
 	return nil
 }
 
+/// 重建 .idx 文件
 func runFix(cmd *Command, args []string) bool {
 
 	if *fixVolumeId == -1 {

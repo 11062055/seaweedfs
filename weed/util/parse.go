@@ -28,6 +28,7 @@ func ParseUint64(text string, defaultValue uint64) uint64 {
 	return count
 }
 
+/// 解析 URL 的 各个 部分
 func ParseFilerUrl(entryPath string) (filerServer string, filerPort int64, path string, err error) {
 	if !strings.HasPrefix(entryPath, "http://") && !strings.HasPrefix(entryPath, "https://") {
 		entryPath = "http://" + entryPath

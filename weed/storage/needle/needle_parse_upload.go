@@ -30,6 +30,7 @@ type ParsedUpload struct {
 func ParseUpload(r *http.Request, sizeLimit int64) (pu *ParsedUpload, e error) {
 	pu = &ParsedUpload{}
 	pu.PairMap = make(map[string]string)
+	/// 获取 http 请求 头部 的 Seaweed- 开头的所有字段
 	for k, v := range r.Header {
 		if len(v) > 0 && strings.HasPrefix(k, PairNamePrefix) {
 			pu.PairMap[k] = v[0]
@@ -37,8 +38,10 @@ func ParseUpload(r *http.Request, sizeLimit int64) (pu *ParsedUpload, e error) {
 	}
 
 	if r.Method == "POST" {
+		/// 读取 固定 大小 的 数据, 其余的丢弃, 保存 在 pu.Data 中
 		e = parseMultipart(r, sizeLimit, pu)
 	} else {
+		/// 读取 固定 大小 的 数据, 其余的丢弃, 保存 在 pu.Data 中
 		e = parsePut(r, sizeLimit, pu)
 	}
 	if e != nil {
@@ -48,6 +51,7 @@ func ParseUpload(r *http.Request, sizeLimit int64) (pu *ParsedUpload, e error) {
 	pu.ModifiedTime, _ = strconv.ParseUint(r.FormValue("ts"), 10, 64)
 	pu.Ttl, _ = ReadTTL(r.FormValue("ttl"))
 
+	/// 获取 数据, 区分压缩 和 没压缩 两种
 	pu.OriginalDataSize = len(pu.Data)
 	pu.UncompressedData = pu.Data
 	if pu.IsGzipped {
@@ -65,6 +69,7 @@ func ParseUpload(r *http.Request, sizeLimit int64) (pu *ParsedUpload, e error) {
 	return
 }
 
+/// 读取 固定 大小 的 数据, 其余的丢弃, 保存 在 pu.Data 中
 func parsePut(r *http.Request, sizeLimit int64, pu *ParsedUpload) (e error) {
 	pu.IsGzipped = r.Header.Get("Content-Encoding") == "gzip"
 	pu.MimeType = r.Header.Get("Content-Type")

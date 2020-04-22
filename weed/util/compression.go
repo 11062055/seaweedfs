@@ -12,6 +12,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/glog"
 )
 
+/// 压缩相关
 func GzipData(input []byte) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	w, _ := gzip.NewWriterLevel(buf, flate.BestSpeed)

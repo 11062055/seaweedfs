@@ -5,6 +5,7 @@ import (
 )
 
 // just for testing
+/// 内存 序列号 生成器
 type MemorySequencer struct {
 	counter      uint64
 	sequenceLock sync.Mutex

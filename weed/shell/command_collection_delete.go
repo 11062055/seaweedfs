@@ -26,6 +26,7 @@ func (c *commandCollectionDelete) Help() string {
 `
 }
 
+/// 删除 collection, 会通过 protobuffer 将 volume server 的 collection 也删除, 之后还要将 leader master 的 topology 中的 map 删除掉
 func (c *commandCollectionDelete) Do(args []string, commandEnv *CommandEnv, writer io.Writer) (err error) {
 
 	if len(args) == 0 {

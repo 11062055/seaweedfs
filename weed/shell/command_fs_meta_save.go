@@ -69,6 +69,10 @@ func (c *commandFsMetaSave) Do(args []string, commandEnv *CommandEnv, writer io.
 	}
 	defer dst.Close()
 
+	/// 以 BFS 方式 列出 目录下 的 所有 文件, 并 调用 函数 , 如果 目录下的文件 还是 目录 则将 子目录 入队列
+	/// 实际调用的远程调用是 ReadDirAllEntries 列出所有目录下的文件或者子目录, 也就是 Entry
+	/// 第二个函数 负责 从 接收到的 数据 生成 待写入本地的数据, 并且传进 channel
+	/// 第一个函数 负责 从 channel 中读 出数据 并且写入本地 文件 dst
 	err = doTraverseBfsAndSaving(commandEnv, writer, path, *verbose, func(outputChan chan interface{}) {
 		sizeBuf := make([]byte, 4)
 		for item := range outputChan {
@@ -96,18 +100,21 @@ func (c *commandFsMetaSave) Do(args []string, commandEnv *CommandEnv, writer io.
 
 }
 
+/// 以 BFS 方式 遍历 并且 调用 saveFn 保存
 func doTraverseBfsAndSaving(commandEnv *CommandEnv, writer io.Writer, path string, verbose bool, saveFn func(outputChan chan interface{}), genFn func(entry *filer_pb.FullEntry, outputChan chan interface{}) error) error {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	outputChan := make(chan interface{}, 1024)
 	go func() {
+		/// 从 channel 中读出
 		saveFn(outputChan)
 		wg.Done()
 	}()
 
 	var dirCount, fileCount uint64
 
+	/// 以 BFS 方式 列出 目录下 的 所有 文件, 并 调用 函数 , 如果 目录下的文件 还是 目录 则将 子目录 入队列
 	err := doTraverseBfs(writer, commandEnv, util.FullPath(path), func(parentPath util.FullPath, entry *filer_pb.Entry) {
 
 		protoMessage := &filer_pb.FullEntry{
@@ -115,6 +122,7 @@ func doTraverseBfsAndSaving(commandEnv *CommandEnv, writer io.Writer, path strin
 			Entry: entry,
 		}
 
+		/// 调用 函数 往 channel 中 写入数据
 		if err := genFn(protoMessage, outputChan); err != nil {
 			fmt.Fprintf(writer, "marshall error: %v\n", err)
 			return
@@ -142,6 +150,7 @@ func doTraverseBfsAndSaving(commandEnv *CommandEnv, writer io.Writer, path strin
 	return err
 }
 
+/// 以 BFS 方式 遍历
 func doTraverseBfs(writer io.Writer, filerClient filer_pb.FilerClient, parentPath util.FullPath, fn func(parentPath util.FullPath, entry *filer_pb.Entry)) (err error) {
 
 	K := 5
@@ -149,6 +158,7 @@ func doTraverseBfs(writer io.Writer, filerClient filer_pb.FilerClient, parentPat
 	var jobQueueWg sync.WaitGroup
 	queue := util.NewQueue()
 	jobQueueWg.Add(1)
+	/// 根目录 入队
 	queue.Enqueue(parentPath)
 	var isTerminating bool
 
@@ -164,6 +174,7 @@ func doTraverseBfs(writer io.Writer, filerClient filer_pb.FilerClient, parentPat
 					continue
 				}
 				dir := t.(util.FullPath)
+				/// 列出 目录下 的 所有 文件, 并 回调 fn , 如果 目录下的文件 还是 目录 则将 子目录 入队列
 				processErr := processOneDirectory(writer, filerClient, dir, queue, &jobQueueWg, fn)
 				if processErr != nil {
 					err = processErr
@@ -179,8 +190,10 @@ func doTraverseBfs(writer io.Writer, filerClient filer_pb.FilerClient, parentPat
 
 func processOneDirectory(writer io.Writer, filerClient filer_pb.FilerClient, parentPath util.FullPath, queue *util.Queue, jobQueueWg *sync.WaitGroup, fn func(parentPath util.FullPath, entry *filer_pb.Entry)) (err error) {
 
+	/// 列出 目录下 的 所有 文件
 	return filer_pb.ReadDirAllEntries(filerClient, parentPath, "", func(entry *filer_pb.Entry, isLast bool) {
 
+		/// 调用 fn
 		fn(parentPath, entry)
 
 		if entry.IsDirectory {
@@ -188,6 +201,7 @@ func processOneDirectory(writer io.Writer, filerClient filer_pb.FilerClient, par
 			if parentPath == "/" {
 				subDir = "/" + entry.Name
 			}
+			/// 保存 子目录
 			jobQueueWg.Add(1)
 			queue.Enqueue(util.FullPath(subDir))
 		}

@@ -20,6 +20,7 @@ type Location struct {
 	PublicUrl string `json:"publicUrl,omitempty"`
 }
 
+/// volume id 到 具体的 location 对应 的 列表
 type vidMap struct {
 	sync.RWMutex
 	vid2Locations map[uint32][]Location

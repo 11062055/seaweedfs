@@ -14,6 +14,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/pb/volume_server_pb"
 )
 
+/// 生成 volume server client
 func WithVolumeServerClient(volumeServer string, grpcDialOption grpc.DialOption, fn func(volume_server_pb.VolumeServerClient) error) error {
 
 	grpcAddress, err := toVolumeServerGrpcAddress(volumeServer)
@@ -21,6 +22,7 @@ func WithVolumeServerClient(volumeServer string, grpcDialOption grpc.DialOption,
 		return fmt.Errorf("failed to parse volume server %v: %v", volumeServer, err)
 	}
 
+	/// 获取连接池中的 grpc client 并用 函数 fn
 	return pb.WithCachedGrpcClient(func(grpcConnection *grpc.ClientConn) error {
 		client := volume_server_pb.NewVolumeServerClient(grpcConnection)
 		return fn(client)
@@ -38,6 +40,7 @@ func toVolumeServerGrpcAddress(volumeServer string) (grpcAddress string, err err
 	return fmt.Sprintf("%s:%d", volumeServer[0:sepIndex], port+10000), nil
 }
 
+/// 生成 master server client
 func WithMasterServerClient(masterServer string, grpcDialOption grpc.DialOption, fn func(masterClient master_pb.SeaweedClient) error) error {
 
 	masterGrpcAddress, parseErr := pb.ParseServerToGrpcAddress(masterServer)

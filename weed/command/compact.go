@@ -31,6 +31,7 @@ var (
 	compactVolumePreallocate = cmdCompact.Flag.Int64("preallocateMB", 0, "preallocate volume disk space")
 )
 
+/// 压缩文件
 func runCompact(cmd *Command, args []string) bool {
 
 	if *compactVolumeId == -1 {

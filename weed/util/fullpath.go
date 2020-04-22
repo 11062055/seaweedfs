@@ -7,6 +7,7 @@ import (
 
 type FullPath string
 
+/// 完整路径相关
 func NewFullPath(dir, name string) FullPath {
 	return FullPath(dir).Child(name)
 }
@@ -35,6 +36,7 @@ func (fp FullPath) Child(name string) FullPath {
 	return FullPath(dir + "/" + name)
 }
 
+/// 获取 一个 路径的 uint64 型 摘要
 func (fp FullPath) AsInode() uint64 {
 	return uint64(HashStringToLong(string(fp)))
 }

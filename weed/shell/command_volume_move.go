@@ -63,20 +63,24 @@ func (c *commandVolumeMove) Do(args []string, commandEnv *CommandEnv, writer io.
 }
 
 // LiveMoveVolume moves one volume from one source volume server to one target volume server, with idleTimeout to drain the incoming requests.
+/// 将一个 volume 从 一个 server 移动到 另一个 server, 首先进行 已有数据拷贝 并且记录最后一个 needle 的时间戳, 然后根据该纳秒时间戳进行增量 tail
 func LiveMoveVolume(grpcDialOption grpc.DialOption, volumeId needle.VolumeId, sourceVolumeServer, targetVolumeServer string, idleTimeout time.Duration) (err error) {
 
 	log.Printf("copying volume %d from %s to %s", volumeId, sourceVolumeServer, targetVolumeServer)
+	/// 先拷贝 volume 并记录 源 volume server 上该 volume 中最后一个 needle 的写入时间
 	lastAppendAtNs, err := copyVolume(grpcDialOption, volumeId, sourceVolumeServer, targetVolumeServer)
 	if err != nil {
 		return fmt.Errorf("copy volume %d from %s to %s: %v", volumeId, sourceVolumeServer, targetVolumeServer, err)
 	}
 
 	log.Printf("tailing volume %d from %s to %s", volumeId, sourceVolumeServer, targetVolumeServer)
+	/// 然后拷贝增量数据
 	if err = tailVolume(grpcDialOption, volumeId, sourceVolumeServer, targetVolumeServer, lastAppendAtNs, idleTimeout); err != nil {
 		return fmt.Errorf("tail volume %d from %s to %s: %v", volumeId, sourceVolumeServer, targetVolumeServer, err)
 	}
 
 	log.Printf("deleting volume %d from %s", volumeId, sourceVolumeServer)
+	/// 再将 源 volume server 中的 数据删除
 	if err = deleteVolume(grpcDialOption, volumeId, sourceVolumeServer); err != nil {
 		return fmt.Errorf("delete volume %d from %s: %v", volumeId, sourceVolumeServer, err)
 	}
@@ -85,6 +89,7 @@ func LiveMoveVolume(grpcDialOption grpc.DialOption, volumeId needle.VolumeId, so
 	return nil
 }
 
+/// 将 volume 从 源 拷贝 到 目标机器, 并且记录 拷贝的 最后一个 needle 写入的 纳秒, 后续用于 tail 该 纳秒后的数据
 func copyVolume(grpcDialOption grpc.DialOption, volumeId needle.VolumeId, sourceVolumeServer, targetVolumeServer string) (lastAppendAtNs uint64, err error) {
 
 	err = operation.WithVolumeServerClient(targetVolumeServer, grpcDialOption, func(volumeServerClient volume_server_pb.VolumeServerClient) error {
@@ -101,6 +106,7 @@ func copyVolume(grpcDialOption grpc.DialOption, volumeId needle.VolumeId, source
 	return
 }
 
+/// 将 某个时间戳 纳秒 后的 volume 数据从一个 机器拷贝到另一个机器
 func tailVolume(grpcDialOption grpc.DialOption, volumeId needle.VolumeId, sourceVolumeServer, targetVolumeServer string, lastAppendAtNs uint64, idleTimeout time.Duration) (err error) {
 
 	return operation.WithVolumeServerClient(targetVolumeServer, grpcDialOption, func(volumeServerClient volume_server_pb.VolumeServerClient) error {
@@ -115,6 +121,7 @@ func tailVolume(grpcDialOption grpc.DialOption, volumeId needle.VolumeId, source
 
 }
 
+/// 删除 volume
 func deleteVolume(grpcDialOption grpc.DialOption, volumeId needle.VolumeId, sourceVolumeServer string) (err error) {
 	return operation.WithVolumeServerClient(sourceVolumeServer, grpcDialOption, func(volumeServerClient volume_server_pb.VolumeServerClient) error {
 		_, deleteErr := volumeServerClient.VolumeDelete(context.Background(), &volume_server_pb.VolumeDeleteRequest{

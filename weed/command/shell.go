@@ -40,6 +40,7 @@ func runShell(command *Command, args []string) bool {
 	}
 	shellOptions.Directory = "/"
 
+	/// 以 shell  的 方式 执行 所有 命令
 	shell.RunShell(shellOptions)
 
 	return true

@@ -39,6 +39,7 @@ func (fs *FilerServer) LookupDirectoryEntry(ctx context.Context, req *filer_pb.L
 	}, nil
 }
 
+/// 列出 目录下 的 所有 文件
 func (fs *FilerServer) ListEntries(req *filer_pb.ListEntriesRequest, stream filer_pb.SeaweedFiler_ListEntriesServer) error {
 
 	limit := int(req.Limit)

@@ -6,6 +6,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/glog"
 )
 
+/// 获取 IP 地址
 func DetectedHostAddress() string {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {

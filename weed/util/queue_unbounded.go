@@ -9,6 +9,7 @@ type UnboundedQueue struct {
 	inboundLock  sync.RWMutex
 }
 
+/// 模拟 入队 和 批量消费, 线程安全
 func NewUnboundedQueue() *UnboundedQueue {
 	q := &UnboundedQueue{}
 	return q
@@ -22,6 +23,7 @@ func (q *UnboundedQueue) EnQueue(items ...string) {
 
 }
 
+/// 批量消费
 func (q *UnboundedQueue) Consume(fn func([]string)) {
 	q.outboundLock.Lock()
 	defer q.outboundLock.Unlock()

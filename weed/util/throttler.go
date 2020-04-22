@@ -15,11 +15,13 @@ func NewWriteThrottler(bytesPerSecond int64) *WriteThrottler {
 	}
 }
 
+/// 限流器 sleep 实现
 func (wt *WriteThrottler) MaybeSlowdown(delta int64) {
 	if wt.compactionBytePerSecond > 0 {
 		wt.lastSizeCounter += delta
 		now := time.Now()
 		elapsedDuration := now.Sub(wt.lastSizeCheckTime)
+		/// 至少 100 毫秒检查 一次
 		if elapsedDuration > 100*time.Millisecond {
 			overLimitBytes := wt.lastSizeCounter - wt.compactionBytePerSecond/10
 			if overLimitBytes > 0 {

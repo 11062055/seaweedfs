@@ -11,6 +11,7 @@ import (
 
 type NeedleMapType int
 
+/// 四种 类型 的 needle map
 const (
 	NeedleMapInMemory      NeedleMapType = iota
 	NeedleMapLevelDb                     // small memory footprint, 4MB total, 1 write buffer, 3 block buffer
@@ -48,6 +49,7 @@ func (nm *baseNeedleMapper) IndexFileSize() uint64 {
 	return 0
 }
 
+/// 写入 一条 数据 到 基础 needle mapper, 即 文件 .idx 中
 func (nm *baseNeedleMapper) appendToIndexFile(key NeedleId, offset Offset, size uint32) error {
 	bytes := needle_map.ToBytes(key, offset, size)
 

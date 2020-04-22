@@ -21,6 +21,7 @@ type EcVolumeShard struct {
 	ecdFileSize int64
 }
 
+/// 生成 一个 ec shard 文件
 func NewEcVolumeShard(dirname string, collection string, id needle.VolumeId, shardId ShardId) (v *EcVolumeShard, e error) {
 
 	v = &EcVolumeShard{dir: dirname, Collection: collection, VolumeId: id, ShardId: shardId}
@@ -28,6 +29,7 @@ func NewEcVolumeShard(dirname string, collection string, id needle.VolumeId, sha
 	baseFileName := v.FileName()
 
 	// open ecd file
+	/// ec shard 文件 的 命名规则: dir,collection_+volumeidString.ec00
 	if v.ecdFile, e = os.OpenFile(baseFileName+ToExt(int(shardId)), os.O_RDONLY, 0644); e != nil {
 		return nil, fmt.Errorf("cannot read ec volume shard %s.%s: %v", baseFileName, ToExt(int(shardId)), e)
 	}

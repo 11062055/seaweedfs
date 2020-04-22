@@ -29,6 +29,7 @@ func (c *commandVolumeCopy) Help() string {
 `
 }
 
+/// 将 volume 从 源 拷贝 到 目标机器, 并且记录 拷贝的 最后一个 needle 写入的 纳秒, 后续用于 tail 该 纳秒后的数据
 func (c *commandVolumeCopy) Do(args []string, commandEnv *CommandEnv, writer io.Writer) (err error) {
 
 	if len(args) != 3 {

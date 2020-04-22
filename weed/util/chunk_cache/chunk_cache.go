@@ -18,6 +18,9 @@ type ChunkCache struct {
 	sync.RWMutex
 }
 
+/// 生成 chunk cache, 同时使用 基于 内存的 和 基于 磁盘的
+/// 本地 磁盘 缓存, leveldb 中存储 .idx 文件中的索引数据, 而 .dat 文件中存储实际数据
+/// 写的时候 既写内存 也写磁盘, 读的时候内存中有就读内存中的, 没有的话就读磁盘中的
 func NewChunkCache(maxEntries int64, dir string, diskSizeMB int64, segmentCount int) *ChunkCache {
 	c := &ChunkCache{
 		memCache: NewChunkCacheInMemory(maxEntries),
@@ -30,6 +33,7 @@ func NewChunkCache(maxEntries int64, dir string, diskSizeMB int64, segmentCount 
 
 	for i := 0; i < volumeCount; i++ {
 		fileName := path.Join(dir, fmt.Sprintf("cache_%d", i))
+		/// 每个 volume 使用一个 磁盘 缓存
 		diskCache, err := LoadOrCreateChunkCacheVolume(fileName, volumeSize*1024*1024)
 		if err != nil {
 			glog.Errorf("failed to add cache %s : %v", fileName, err)
@@ -46,6 +50,7 @@ func NewChunkCache(maxEntries int64, dir string, diskSizeMB int64, segmentCount 
 	return c
 }
 
+/// 首先从内存 缓存 获取, 内存没有的话 再 从 磁盘 获取
 func (c *ChunkCache) GetChunk(fileId string) (data []byte) {
 	if c == nil {
 		return
@@ -54,9 +59,11 @@ func (c *ChunkCache) GetChunk(fileId string) (data []byte) {
 	c.RLock()
 	defer c.RUnlock()
 
+	/// 首先从内存 缓存 获取, 内存没有的话 再 从 磁盘 获取
 	return c.doGetChunk(fileId)
 }
 
+/// 首先从内存 缓存 获取, 内存没有的话 再 从 磁盘 获取
 func (c *ChunkCache) doGetChunk(fileId string) (data []byte) {
 	if data = c.memCache.GetChunk(fileId); data != nil {
 		return data
@@ -83,6 +90,7 @@ func (c *ChunkCache) doGetChunk(fileId string) (data []byte) {
 	return nil
 }
 
+/// 先写内存 缓存, 之后再写 硬盘 缓存
 func (c *ChunkCache) SetChunk(fileId string, data []byte) {
 	if c == nil {
 		return
@@ -93,6 +101,7 @@ func (c *ChunkCache) SetChunk(fileId string, data []byte) {
 	c.doSetChunk(fileId, data)
 }
 
+/// 先写内存 缓存, 之后再写 硬盘 缓存
 func (c *ChunkCache) doSetChunk(fileId string, data []byte) {
 
 	c.memCache.SetChunk(fileId, data)

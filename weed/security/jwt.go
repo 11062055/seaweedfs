@@ -13,6 +13,7 @@ import (
 type EncodedJwt string
 type SigningKey []byte
 
+/// JSON Web Tokens 权限相关
 type SeaweedFileIdClaims struct {
 	Fid string `json:"fid"`
 	jwt.StandardClaims

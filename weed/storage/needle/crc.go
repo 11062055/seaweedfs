@@ -8,6 +8,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/util"
 )
 
+/// crc32 相关
 var table = crc32.MakeTable(crc32.Castagnoli)
 
 type CRC uint32

@@ -32,6 +32,7 @@ func (c *commandVolumeMount) Help() string {
 `
 }
 
+/// 向 某个 volume server 发起请求 执行 加载卷命令 VolumeMount
 func (c *commandVolumeMount) Do(args []string, commandEnv *CommandEnv, writer io.Writer) (err error) {
 
 	if len(args) != 2 {
@@ -49,6 +50,8 @@ func (c *commandVolumeMount) Do(args []string, commandEnv *CommandEnv, writer io
 
 }
 
+/// 递归加载每个子目录中的卷信息
+/// Store->DiskLocation->Volume->Needle
 func mountVolume(grpcDialOption grpc.DialOption, volumeId needle.VolumeId, sourceVolumeServer string) (err error) {
 	return operation.WithVolumeServerClient(sourceVolumeServer, grpcDialOption, func(volumeServerClient volume_server_pb.VolumeServerClient) error {
 		_, mountErr := volumeServerClient.VolumeMount(context.Background(), &volume_server_pb.VolumeMountRequest{

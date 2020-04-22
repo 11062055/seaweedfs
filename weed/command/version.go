@@ -14,6 +14,7 @@ var cmdVersion = &Command{
 	Long:      `Version prints the SeaweedFS version`,
 }
 
+///
 func runVersion(cmd *Command, args []string) bool {
 	if len(args) != 0 {
 		cmd.Usage()

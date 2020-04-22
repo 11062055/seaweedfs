@@ -6,6 +6,7 @@ import (
 	"github.com/google/btree"
 )
 
+/// .idx 文件中 和 leveldb 中存储的数据结构
 type NeedleValue struct {
 	Key    NeedleId
 	Offset Offset `comment:"Volume offset"` //since aligned to 8 bytes, range is 4G*8=32G

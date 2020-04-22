@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+/// 副本格式
 type ReplicaPlacement struct {
 	SameRackCount       int
 	DiffRackCount       int

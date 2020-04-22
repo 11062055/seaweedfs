@@ -4,6 +4,7 @@ import (
 	"time"
 )
 
+/// 各种 状态 的计数器 用于统计打点
 type ServerStats struct {
 	Requests       *DurationCounter
 	Connections    *DurationCounter

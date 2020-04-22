@@ -11,6 +11,7 @@ import (
 
 // walks through the index file, calls fn function with each key, offset, size
 // stops with the error returned by the fn function
+/// 遍历 .idx 文件, 并且 调用 函数 fn 处理 每一条 needle 信息
 func WalkIndexFile(r *os.File, fn func(key types.NeedleId, offset types.Offset, size uint32) error) error {
 	var readerOffset int64
 	bytes := make([]byte, types.NeedleMapEntrySize*RowsToRead)

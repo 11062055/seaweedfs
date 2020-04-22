@@ -6,6 +6,7 @@ import (
 
 // A mostly for read map, which can thread-safely
 // initialize the map entries.
+/// 通常 的 map 不是并发安全的, 这里进行简单封装
 type ConcurrentReadMap struct {
 	sync.RWMutex
 

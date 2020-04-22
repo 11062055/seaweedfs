@@ -60,6 +60,7 @@ var cmdUpload = &Command{
   `,
 }
 
+/// 上传 文件
 func runUpload(cmd *Command, args []string) bool {
 
 	util.LoadConfiguration("security", false)

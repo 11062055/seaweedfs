@@ -15,6 +15,7 @@ import (
 * Call this function on any file uploaded to SeaweedFS
 *
  */
+/// 图片 处理
 func MaybePreprocessImage(filename string, data []byte, width, height int) (resized io.ReadSeeker, w int, h int) {
 	ext := filepath.Ext(filename)
 	ext = strings.ToLower(ext)

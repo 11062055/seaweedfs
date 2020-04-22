@@ -125,6 +125,7 @@ func Delete(url string, jwt string) error {
 	return errors.New(string(body))
 }
 
+/// 分批次 获取流式 响应 并 回调有关 回调函数
 func GetBufferStream(url string, values url.Values, allocatedBytes []byte, eachBuffer func([]byte)) error {
 	r, err := client.PostForm(url, values)
 	if err != nil {
@@ -148,6 +149,7 @@ func GetBufferStream(url string, values url.Values, allocatedBytes []byte, eachB
 	}
 }
 
+/// 获取流式 响应 并 回调有关 回调函数
 func GetUrlStream(url string, values url.Values, readFn func(io.Reader) error) error {
 	r, err := client.PostForm(url, values)
 	if err != nil {
@@ -189,23 +191,28 @@ func NormalizeUrl(url string) string {
 	return "http://" + url
 }
 
+/// 从 url 处读取数据, 保存在 buf 中, 区分 chunk 和 非 chunk
 func ReadUrl(fileUrl string, cipherKey []byte, isGzipped bool, isFullChunk bool, offset int64, size int, buf []byte) (int64, error) {
 
 	if cipherKey != nil {
 		var n int
+		/// 读取加密后的数据
 		err := readEncryptedUrl(fileUrl, cipherKey, isGzipped, isFullChunk, offset, size, func(data []byte) {
 			n = copy(buf, data)
 		})
 		return int64(n), err
 	}
 
+	/// 否则发起正常 的 http get 请求
 	req, err := http.NewRequest("GET", fileUrl, nil)
 	if err != nil {
 		return 0, err
 	}
+	/// 分块下载
 	if !isFullChunk {
 		req.Header.Add("Range", fmt.Sprintf("bytes=%d-%d", offset, offset+int64(size)-1))
 	} else {
+		/// 一次下载完成的数据, 不分块
 		req.Header.Set("Accept-Encoding", "gzip")
 	}
 
@@ -219,6 +226,7 @@ func ReadUrl(fileUrl string, cipherKey []byte, isGzipped bool, isFullChunk bool,
 		return 0, fmt.Errorf("%s: %s", fileUrl, r.Status)
 	}
 
+	/// 获取 读取 响应 的 reader
 	var reader io.ReadCloser
 	contentEncoding := r.Header.Get("Content-Encoding")
 	switch contentEncoding {
@@ -236,6 +244,7 @@ func ReadUrl(fileUrl string, cipherKey []byte, isGzipped bool, isFullChunk bool,
 
 	// refers to https://github.com/golang/go/blob/master/src/bytes/buffer.go#L199
 	// commit id c170b14c2c1cfb2fd853a37add92a82fd6eb4318
+	/// 从 响应 reader 中 循环 读取数据, 直到 读完 或者 出错 或者 buf 被 读满
 	for {
 		m, err = reader.Read(buf[i:])
 		i += m
@@ -251,6 +260,7 @@ func ReadUrl(fileUrl string, cipherKey []byte, isGzipped bool, isFullChunk bool,
 		}
 	}
 	// drains the response body to avoid memory leak
+	/// 剩余数据被丢弃, 并记录日志
 	data, _ := ioutil.ReadAll(reader)
 	if len(data) != 0 {
 		glog.V(1).Infof("%s reader has remaining %d bytes", contentEncoding, len(data))
@@ -258,6 +268,7 @@ func ReadUrl(fileUrl string, cipherKey []byte, isGzipped bool, isFullChunk bool,
 	return n, err
 }
 
+/// 流式读取 数据 通过 缓存 循环读取 数据 并且 调用回调 直到 数据被 读完
 func ReadUrlAsStream(fileUrl string, cipherKey []byte, isContentGzipped bool, isFullChunk bool, offset int64, size int, fn func(data []byte)) error {
 
 	if cipherKey != nil {
@@ -287,6 +298,7 @@ func ReadUrlAsStream(fileUrl string, cipherKey []byte, isContentGzipped bool, is
 	)
 	buf := make([]byte, 64*1024)
 
+	/// 通过 缓存 循环读取 数据 并且 调用回调 直到 数据被 读完
 	for {
 		m, err = r.Body.Read(buf)
 		fn(buf[:m])
@@ -301,14 +313,17 @@ func ReadUrlAsStream(fileUrl string, cipherKey []byte, isContentGzipped bool, is
 }
 
 func readEncryptedUrl(fileUrl string, cipherKey []byte, isContentGzipped bool, isFullChunk bool, offset int64, size int, fn func(data []byte)) error {
+	/// 获取 数据
 	encryptedData, err := Get(fileUrl)
 	if err != nil {
 		return fmt.Errorf("fetch %s: %v", fileUrl, err)
 	}
+	/// 解密
 	decryptedData, err := Decrypt(encryptedData, CipherKey(cipherKey))
 	if err != nil {
 		return fmt.Errorf("decrypt %s: %v", fileUrl, err)
 	}
+	/// 解压
 	if isContentGzipped {
 		decryptedData, err = UnGzipData(decryptedData)
 		if err != nil {
@@ -318,6 +333,7 @@ func readEncryptedUrl(fileUrl string, cipherKey []byte, isContentGzipped bool, i
 	if len(decryptedData) < int(offset)+size {
 		return fmt.Errorf("read decrypted %s size %d [%d, %d)", fileUrl, len(decryptedData), offset, int(offset)+size)
 	}
+	/// 完整 块
 	if isFullChunk {
 		fn(decryptedData)
 	} else {

@@ -12,6 +12,7 @@ import (
 )
 
 // ReadSuperBlock reads from data file and load it into volume's super block
+/// 从 文件中 读取 超级块 信息
 func ReadSuperBlock(datBackend backend.BackendStorageFile) (superBlock SuperBlock, err error) {
 
 	header := make([]byte, SuperBlockSize)

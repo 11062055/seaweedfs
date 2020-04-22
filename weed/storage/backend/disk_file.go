@@ -9,6 +9,7 @@ var (
 	_ BackendStorageFile = &DiskFile{}
 )
 
+/// 用 磁盘 文件 当作 backend 的 storage
 type DiskFile struct {
 	File         *os.File
 	fullFilePath string

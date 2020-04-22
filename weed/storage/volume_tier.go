@@ -12,6 +12,7 @@ func (v *Volume) GetVolumeInfo() *volume_server_pb.VolumeInfo {
 	return v.volumeInfo
 }
 
+/// 将文件 .vif 中的 数据 读出来 并且 解析为 VolumeInfo
 func (v *Volume) maybeLoadVolumeInfo() (found bool) {
 
 	v.volumeInfo, v.hasRemoteFile, _ = pb.MaybeLoadVolumeInfo(v.FileName() + ".vif")

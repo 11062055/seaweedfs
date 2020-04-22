@@ -32,6 +32,7 @@ func (c *Configuration) String() string {
 	return ""
 }
 
+/// 定位一个 ip 在 哪个 data center \ rack
 func (c *Configuration) Locate(ip string, dcName string, rackName string) (dc string, rack string) {
 	if c != nil && c.ip2location != nil {
 		if loc, ok := c.ip2location[ip]; ok {

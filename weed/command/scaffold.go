@@ -30,6 +30,7 @@ var (
 	config     = cmdScaffold.Flag.String("config", "filer", "[filer|notification|replication|security|master] the configuration file to generate")
 )
 
+/// 生成 一个 filer.toml 文件
 func runScaffold(cmd *Command, args []string) bool {
 
 	content := ""

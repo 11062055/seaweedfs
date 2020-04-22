@@ -4,6 +4,7 @@ import (
 	"strconv"
 )
 
+/// volume id 实际是 32 位无符号整型
 type VolumeId uint32
 
 func NewVolumeId(vid string) (VolumeId, error) {

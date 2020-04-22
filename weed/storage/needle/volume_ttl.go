@@ -15,6 +15,7 @@ const (
 	Year
 )
 
+/// 单位 和 数值
 type TTL struct {
 	Count byte
 	Unit  byte
@@ -35,6 +36,7 @@ func ReadTTL(ttlString string) (*TTL, error) {
 		return EMPTY_TTL, nil
 	}
 	ttlBytes := []byte(ttlString)
+	/// 最后一个字节 是 单位, 比如 m h d w M y
 	unitByte := ttlBytes[len(ttlBytes)-1]
 	countBytes := ttlBytes[0 : len(ttlBytes)-1]
 	if '0' <= unitByte && unitByte <= '9' {

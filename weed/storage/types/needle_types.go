@@ -19,6 +19,7 @@ type OffsetLower struct {
 	b0 byte // the smaller byte
 }
 
+/// needle 的 cookie 实际是 个 32 位 的 无符号 整型
 type Cookie uint32
 
 const (

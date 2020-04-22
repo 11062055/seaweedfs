@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/push"
 )
 
+/// prometheus 打点
 var (
 	FilerGather        = prometheus.NewRegistry()
 	VolumeServerGather = prometheus.NewRegistry()

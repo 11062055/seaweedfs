@@ -21,9 +21,11 @@ type LevelDbNeedleMap struct {
 	db         *leveldb.DB
 }
 
+/// 将 .idx 文件中的数据 更新到 leveldb 中去
 func NewLevelDbNeedleMap(dbFileName string, indexFile *os.File, opts *opt.Options) (m *LevelDbNeedleMap, err error) {
 	m = &LevelDbNeedleMap{dbFileName: dbFileName}
 	m.indexFile = indexFile
+	/// leveldb 是否 在 .idx 文件修改 之后 修改的
 	if !isLevelDbFresh(dbFileName, indexFile) {
 		glog.V(0).Infof("Start to Generate %s from %s", dbFileName, indexFile.Name())
 		generateLevelDbFile(dbFileName, indexFile)
@@ -43,6 +45,7 @@ func NewLevelDbNeedleMap(dbFileName string, indexFile *os.File, opts *opt.Option
 	return
 }
 
+/// leveldb 是否 在 .idx 文件修改 之后 修改的
 func isLevelDbFresh(dbFileName string, indexFile *os.File) bool {
 	// normally we always write to index file first
 	dbLogFile, err := os.Open(filepath.Join(dbFileName, "LOG"))
@@ -60,6 +63,7 @@ func isLevelDbFresh(dbFileName string, indexFile *os.File) bool {
 	return dbStat.ModTime().After(indexStat.ModTime())
 }
 
+/// 将 .idx 文件中的信息 写入 leveldb 中
 func generateLevelDbFile(dbFileName string, indexFile *os.File) error {
 	db, err := leveldb.OpenFile(dbFileName, nil)
 	if err != nil {
@@ -76,6 +80,7 @@ func generateLevelDbFile(dbFileName string, indexFile *os.File) error {
 	})
 }
 
+/// 从 leveldb 中读取出来
 func (m *LevelDbNeedleMap) Get(key NeedleId) (element *needle_map.NeedleValue, ok bool) {
 	bytes := make([]byte, NeedleIdSize)
 	NeedleIdToBytes(bytes[0:NeedleIdSize], key)
@@ -88,6 +93,7 @@ func (m *LevelDbNeedleMap) Get(key NeedleId) (element *needle_map.NeedleValue, o
 	return &needle_map.NeedleValue{Key: key, Offset: offset, Size: size}, true
 }
 
+/// 写入 同时 写到 .idx 文件 和 leveldb 中去
 func (m *LevelDbNeedleMap) Put(key NeedleId, offset Offset, size uint32) error {
 	var oldSize uint32
 	if oldNeedle, ok := m.Get(key); ok {
@@ -101,6 +107,7 @@ func (m *LevelDbNeedleMap) Put(key NeedleId, offset Offset, size uint32) error {
 	return levelDbWrite(m.db, key, offset, size)
 }
 
+/// 写到 leveldb 中去
 func levelDbWrite(db *leveldb.DB, key NeedleId, offset Offset, size uint32) error {
 
 	bytes := needle_map.ToBytes(key, offset, size)
@@ -110,12 +117,14 @@ func levelDbWrite(db *leveldb.DB, key NeedleId, offset Offset, size uint32) erro
 	}
 	return nil
 }
+/// 从 leveldb 中删除
 func levelDbDelete(db *leveldb.DB, key NeedleId) error {
 	bytes := make([]byte, NeedleIdSize)
 	NeedleIdToBytes(bytes, key)
 	return db.Delete(bytes, nil)
 }
 
+/// 从 .idx 文件进行 append 软删除, 然后从 leveldb 中删除
 func (m *LevelDbNeedleMap) Delete(key NeedleId, offset Offset) error {
 	if oldNeedle, ok := m.Get(key); ok {
 		m.logDelete(oldNeedle.Size)
@@ -127,6 +136,7 @@ func (m *LevelDbNeedleMap) Delete(key NeedleId, offset Offset) error {
 	return levelDbDelete(m.db, key)
 }
 
+/// .idx 文件关闭 然后 leveldb 再关闭
 func (m *LevelDbNeedleMap) Close() {
 	indexFileName := m.indexFile.Name()
 	if err := m.indexFile.Sync(); err != nil {

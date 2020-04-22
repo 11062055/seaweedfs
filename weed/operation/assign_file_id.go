@@ -32,6 +32,7 @@ type AssignResult struct {
 	Auth      security.EncodedJwt `json:"auth,omitempty"`
 }
 
+/// 向 master 发起 请求 分配 volume id
 func Assign(server string, grpcDialOption grpc.DialOption, primaryRequest *VolumeAssignRequest, alternativeRequests ...*VolumeAssignRequest) (*AssignResult, error) {
 
 	var requests []*VolumeAssignRequest

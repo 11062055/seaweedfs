@@ -26,6 +26,7 @@ func TailVolume(master string, grpcDialOption grpc.DialOption, vid needle.Volume
 	return TailVolumeFromSource(volumeServer, grpcDialOption, vid, sinceNs, timeoutSeconds, fn)
 }
 
+/// 从 目标 volume server 上用类似 tail 的方式进行拷贝 needle , 只拷贝 sinceNs 纳秒后添加的, 并调用 fn 处理 needle
 func TailVolumeFromSource(volumeServer string, grpcDialOption grpc.DialOption, vid needle.VolumeId, sinceNs uint64, idleTimeoutSeconds int, fn func(n *needle.Needle) error) error {
 	return WithVolumeServerClient(volumeServer, grpcDialOption, func(client volume_server_pb.VolumeServerClient) error {
 

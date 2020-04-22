@@ -32,6 +32,7 @@ func (c *commandVolumeUnmount) Help() string {
 `
 }
 
+/// 向 某个 volume server 发起请求 执行 卸载卷命令 VolumeUnmount
 func (c *commandVolumeUnmount) Do(args []string, commandEnv *CommandEnv, writer io.Writer) (err error) {
 
 	if len(args) != 2 {

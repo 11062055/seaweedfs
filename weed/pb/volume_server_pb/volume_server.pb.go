@@ -2938,6 +2938,7 @@ func _VolumeServer_BatchDelete_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+/// 将 数据 全部 读取 到内存中 然后分批 发送给 端上
 func _VolumeServer_FileGet_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(FileGetRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -3085,6 +3086,7 @@ func _VolumeServer_VolumeSyncStatus_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+/// 读取某一纳秒 后的 所有数据 即增量读取
 func _VolumeServer_VolumeIncrementalCopy_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(VolumeIncrementalCopyRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -3160,6 +3162,7 @@ func _VolumeServer_VolumeDelete_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+/// 标记为只读
 func _VolumeServer_VolumeMarkReadonly_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(VolumeMarkReadonlyRequest)
 	if err := dec(in); err != nil {
@@ -3214,6 +3217,7 @@ func _VolumeServer_VolumeCopy_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+/// 获取卷文件状态
 func _VolumeServer_ReadVolumeFileStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ReadVolumeFileStatusRequest)
 	if err := dec(in); err != nil {
@@ -3232,6 +3236,7 @@ func _VolumeServer_ReadVolumeFileStatus_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+/// 拷贝 文件 给 调用方
 func _VolumeServer_CopyFile_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(CopyFileRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -3253,6 +3258,7 @@ func (x *volumeServerCopyFileServer) Send(m *CopyFileResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+/// 将 lastTimestampNs 纳秒以后的 needle 全部发送, 并且进行 类 tail 方式 等待一段时间 再发送
 func _VolumeServer_VolumeTailSender_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(VolumeTailSenderRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -3274,6 +3280,7 @@ func (x *volumeServerVolumeTailSenderServer) Send(m *VolumeTailSenderResponse) e
 	return x.ServerStream.SendMsg(m)
 }
 
+/// 从 目标 volume server 上用类似 tail 的方式进行拷贝 needle , 只拷贝 sinceNs 纳秒后添加的, 并将数据写入本地
 func _VolumeServer_VolumeTailReceiver_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(VolumeTailReceiverRequest)
 	if err := dec(in); err != nil {
@@ -3292,6 +3299,7 @@ func _VolumeServer_VolumeTailReceiver_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+/// 生成 .ecx 文件 和 .ec00 ~ .ec13 文件 和 .vif 文件
 func _VolumeServer_VolumeEcShardsGenerate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(VolumeEcShardsGenerateRequest)
 	if err := dec(in); err != nil {
@@ -3328,6 +3336,7 @@ func _VolumeServer_VolumeEcShardsRebuild_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+/// 拷贝 .ec00 ~ .ec13 文件 .ecx 文件 .ecj 文件 .vif 文件
 func _VolumeServer_VolumeEcShardsCopy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(VolumeEcShardsCopyRequest)
 	if err := dec(in); err != nil {
@@ -3382,6 +3391,7 @@ func _VolumeServer_VolumeEcShardsMount_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+/// 解挂 volume
 func _VolumeServer_VolumeEcShardsUnmount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(VolumeEcShardsUnmountRequest)
 	if err := dec(in); err != nil {
@@ -3400,6 +3410,7 @@ func _VolumeServer_VolumeEcShardsUnmount_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+/// 读取 ec shard
 func _VolumeServer_VolumeEcShardRead_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(VolumeEcShardReadRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -3421,6 +3432,7 @@ func (x *volumeServerVolumeEcShardReadServer) Send(m *VolumeEcShardReadResponse)
 	return x.ServerStream.SendMsg(m)
 }
 
+/// 通过二分查找方法 将 needle 从 ecx 文件中标记为删除
 func _VolumeServer_VolumeEcBlobDelete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(VolumeEcBlobDeleteRequest)
 	if err := dec(in); err != nil {
@@ -3439,6 +3451,7 @@ func _VolumeServer_VolumeEcBlobDelete_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+/// 从 .ec00 ~ .ec13 文件生成 .dat 文件, 从 .ecx 和 .ecj 生成 .idx 文件
 func _VolumeServer_VolumeEcShardsToVolume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(VolumeEcShardsToVolumeRequest)
 	if err := dec(in); err != nil {
@@ -3538,7 +3551,7 @@ func (x *volumeServerQueryServer) Send(m *QueriedStripe) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-/// volume server 的 grpc
+/// volume server 的 所有 grpc
 var _VolumeServer_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "volume_server_pb.VolumeServer",
 	HandlerType: (*VolumeServerServer)(nil),

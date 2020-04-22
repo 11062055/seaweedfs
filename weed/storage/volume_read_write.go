@@ -212,7 +212,7 @@ func ScanVolumeFile(dirname string, collection string, id needle.VolumeId,
 	return ScanVolumeFileFrom(version, v.DataBackend, offset, volumeFileScanner)
 }
 
-/// 循环扫描 volume 中的 Needle 文件
+/// 循环扫描 volume 中的 Needle 文件, 头部 和 数据体 保存在 backend 中
 func ScanVolumeFileFrom(version needle.Version, datBackend backend.BackendStorageFile, offset int64, volumeFileScanner VolumeFileScanner) (err error) {
 	/// 获取头部信息 n 是 Needle 包含 Cookie Id Size 三个字段, 数据保存在 datBackend 磁盘文件中
 	n, nh, rest, e := needle.ReadNeedleHeader(datBackend, version, offset)

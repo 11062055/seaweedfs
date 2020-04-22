@@ -34,7 +34,7 @@ var (
 )
 
 /// 查找 volume 有缓存则用缓存 没有缓存则向 server (是master) 发送请求
-/// Volume Server 的 GetOrHeadHandler 中会调用, 当 本地 查不到时 进行 redirect 是调用
+/// Volume Server 的 GetOrHeadHandler 中会调用, 当 本地 查不到时 进行 redirect 时调用
 func Lookup(server string, vid string) (ret *LookupResult, err error) {
 	locations, cache_err := vc.Get(vid)
 	if cache_err != nil {

@@ -107,6 +107,7 @@ const (
 
 const severityChar = "IWEF"
 
+/// 日志级别
 var severityName = []string{
 	infoLog:    "INFO",
 	warningLog: "WARNING",

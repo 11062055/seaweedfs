@@ -62,9 +62,12 @@ update needle map when receiving new .dat bytes. But seems not necessary now.)
 
 */
 
+/// 从远端 volume server 增量 备份 数据 到 本地
 func (v *Volume) IncrementalBackup(volumeServer string, grpcDialOption grpc.DialOption) error {
 
+	/// 本地数据写入点
 	startFromOffset, _, _ := v.FileStat()
+	/// 获取最后一个 IdxFileEntry 添加 的 纳秒 找到备份点
 	appendAtNs, err := v.findLastAppendAtNs()
 	if err != nil {
 		return err
@@ -74,6 +77,7 @@ func (v *Volume) IncrementalBackup(volumeServer string, grpcDialOption grpc.Dial
 
 	err = operation.WithVolumeServerClient(volumeServer, grpcDialOption, func(client volume_server_pb.VolumeServerClient) error {
 
+		/// 向远端 volume server 获取 某个备份点 后的数据
 		stream, err := client.VolumeIncrementalCopy(context.Background(), &volume_server_pb.VolumeIncrementalCopyRequest{
 			VolumeId: uint32(v.Id),
 			SinceNs:  appendAtNs,
@@ -92,6 +96,7 @@ func (v *Volume) IncrementalBackup(volumeServer string, grpcDialOption grpc.Dial
 				}
 			}
 
+			/// 再向本地写入数据
 			n, writeErr := v.DataBackend.WriteAt(resp.FileContent, writeOffset)
 			if writeErr != nil {
 				return writeErr
@@ -113,6 +118,7 @@ func (v *Volume) IncrementalBackup(volumeServer string, grpcDialOption grpc.Dial
 }
 
 func (v *Volume) findLastAppendAtNs() (uint64, error) {
+	/// 从 .idx 文件中获取最后一个 IdxFileEntry 的 offset
 	offset, err := v.locateLastAppendEntry()
 	if err != nil {
 		return 0, err
@@ -120,9 +126,11 @@ func (v *Volume) findLastAppendAtNs() (uint64, error) {
 	if offset.IsZero() {
 		return 0, nil
 	}
+	/// 获得某处数据 添加的 纳秒
 	return v.readAppendAtNs(offset)
 }
 
+/// 从 .idx 文件中获取最后一个 IdxFileEntry 的 offset
 func (v *Volume) locateLastAppendEntry() (Offset, error) {
 	indexFile, e := os.OpenFile(v.FileName()+".idx", os.O_RDONLY, 0644)
 	if e != nil {
@@ -152,12 +160,15 @@ func (v *Volume) locateLastAppendEntry() (Offset, error) {
 	return offset, nil
 }
 
+/// 获得某处数据 添加的 纳秒
 func (v *Volume) readAppendAtNs(offset Offset) (uint64, error) {
 
+	/// 读取 needle header
 	n, _, bodyLength, err := needle.ReadNeedleHeader(v.DataBackend, v.SuperBlock.Version, offset.ToAcutalOffset())
 	if err != nil {
 		return 0, fmt.Errorf("ReadNeedleHeader: %v", err)
 	}
+	/// 读取 needle body
 	_, err = n.ReadNeedleBody(v.DataBackend, v.SuperBlock.Version, offset.ToAcutalOffset()+int64(NeedleHeaderSize), bodyLength)
 	if err != nil {
 		return 0, fmt.Errorf("ReadNeedleBody offset %d, bodyLength %d: %v", offset.ToAcutalOffset(), bodyLength, err)
@@ -167,6 +178,7 @@ func (v *Volume) readAppendAtNs(offset Offset) (uint64, error) {
 }
 
 // on server side
+/// 从 sinceNs 纳秒 处 开始, 通过 index file 读取 1 个 needle 在 volume 的 offset
 func (v *Volume) BinarySearchByAppendAtNs(sinceNs uint64) (offset Offset, isLast bool, err error) {
 	indexFile, openErr := os.OpenFile(v.FileName()+".idx", os.O_RDONLY, 0644)
 	if openErr != nil {
@@ -200,11 +212,13 @@ func (v *Volume) BinarySearchByAppendAtNs(sinceNs uint64) (offset Offset, isLast
 		}
 
 		// read the appendAtNs for entry m
+		/// 通过 index file 读取 第 m 个 needle 在 volume 的 offset
 		offset, err = v.readAppendAtNsForIndexEntry(indexFile, bytes, m)
 		if err != nil {
 			return
 		}
 
+		/// 获得某处数据 添加的 纳秒
 		mNs, nsReadErr := v.readAppendAtNs(offset)
 		if nsReadErr != nil {
 			err = nsReadErr
@@ -231,6 +245,7 @@ func (v *Volume) BinarySearchByAppendAtNs(sinceNs uint64) (offset Offset, isLast
 }
 
 // bytes is of size NeedleMapEntrySize
+/// 通过 index file 读取 第 m 个 needle 在 volume 的 offset
 func (v *Volume) readAppendAtNsForIndexEntry(indexFile *os.File, bytes []byte, m int64) (Offset, error) {
 	if _, readErr := indexFile.ReadAt(bytes, m*NeedleMapEntrySize); readErr != nil && readErr != io.EOF {
 		return Offset{}, readErr

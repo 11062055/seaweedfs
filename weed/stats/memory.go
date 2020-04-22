@@ -6,6 +6,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/pb/volume_server_pb"
 )
 
+/// 内存 状态
 func MemStat() *volume_server_pb.MemStatus {
 	mem := &volume_server_pb.MemStatus{}
 	mem.Goroutines = int32(runtime.NumGoroutine())

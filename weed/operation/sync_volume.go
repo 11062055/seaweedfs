@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+/// 获取 volume 的 同步 状态 TailOffset
 func GetVolumeSyncStatus(server string, grpcDialOption grpc.DialOption, vid uint32) (resp *volume_server_pb.VolumeSyncStatusResponse, err error) {
 
 	WithVolumeServerClient(server, grpcDialOption, func(client volume_server_pb.VolumeServerClient) error {

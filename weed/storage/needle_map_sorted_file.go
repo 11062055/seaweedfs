@@ -16,12 +16,15 @@ type SortedFileNeedleMap struct {
 	dbFileSize   int64
 }
 
+/// 将 idx 文件中的 数据首先读入 leveldb 中 , 然后按序读出 并且写入 .sdx 文件中去
+/// 将 .idx 中的文件 的相关 数据 遍历 到 metric 中去
 func NewSortedFileNeedleMap(baseFileName string, indexFile *os.File) (m *SortedFileNeedleMap, err error) {
 	m = &SortedFileNeedleMap{baseFileName: baseFileName}
 	m.indexFile = indexFile
 	fileName := baseFileName + ".sdx"
 	if !isSortedFileFresh(fileName, indexFile) {
 		glog.V(0).Infof("Start to Generate %s from %s", fileName, indexFile.Name())
+		/// 将 idx 文件中的 数据首先读入 leveldb 中 , 然后按序读出 并且写入 .sdx 文件中去
 		erasure_coding.WriteSortedFileFromIdx(baseFileName, ".sdx")
 		glog.V(0).Infof("Finished Generating %s from %s", fileName, indexFile.Name())
 	}
@@ -33,6 +36,7 @@ func NewSortedFileNeedleMap(baseFileName string, indexFile *os.File) (m *SortedF
 	dbStat, _ := m.dbFile.Stat()
 	m.dbFileSize = dbStat.Size()
 	glog.V(1).Infof("Loading %s...", indexFile.Name())
+	/// 将 .idx 中的文件 的相关 数据 遍历 到 metric 中去
 	mm, indexLoadError := newNeedleMapMetricFromIndexFile(indexFile)
 	if indexLoadError != nil {
 		return nil, indexLoadError
@@ -69,6 +73,7 @@ func (m *SortedFileNeedleMap) Put(key NeedleId, offset Offset, size uint32) erro
 	return os.ErrInvalid
 }
 
+/// 删除是以 append 的 形式
 func (m *SortedFileNeedleMap) Delete(key NeedleId, offset Offset) error {
 
 	_, size, err := erasure_coding.SearchNeedleFromSortedIndex(m.dbFile, m.dbFileSize, key, nil)

@@ -21,6 +21,7 @@ const (
 * Byte 4 and byte 5: The number of times the volume has been compacted.
 * Rest bytes: Reserved
  */
+/// 超级块记录了 副本 信息 和 ttl 信息 等
 type SuperBlock struct {
 	Version            needle.Version
 	ReplicaPlacement   *ReplicaPlacement

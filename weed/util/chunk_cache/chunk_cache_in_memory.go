@@ -11,6 +11,7 @@ type ChunkCacheInMemory struct {
 	cache *ccache.Cache
 }
 
+/// 内存 缓存
 func NewChunkCacheInMemory(maxEntries int64) *ChunkCacheInMemory {
 	pruneCount := maxEntries >> 3
 	if pruneCount <= 0 {

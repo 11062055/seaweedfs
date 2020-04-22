@@ -2,5 +2,6 @@
 
 package util
 
+///
 func OnInterrupt(fn func()) {
 }

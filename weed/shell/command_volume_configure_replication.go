@@ -53,6 +53,7 @@ func (c *commandVolumeConfigureReplication) Do(args []string, commandEnv *Comman
 	replicaPlacementInt32 := uint32(replicaPlacement.Byte())
 
 	var resp *master_pb.VolumeListResponse
+	/// 获取所有 的 volume list
 	err = commandEnv.MasterClient.WithClient(func(client master_pb.SeaweedClient) error {
 		resp, err = client.VolumeList(context.Background(), &master_pb.VolumeListRequest{})
 		return err
@@ -65,9 +66,11 @@ func (c *commandVolumeConfigureReplication) Do(args []string, commandEnv *Comman
 
 	// find all data nodes with volumes that needs replication change
 	var allLocations []location
+	/// 遍历所有 data center \ rack \ data node
 	eachDataNode(resp.TopologyInfo, func(dc string, rack RackId, dn *master_pb.DataNodeInfo) {
 		loc := newLocation(dc, string(rack), dn)
 		for _, v := range dn.VolumeInfos {
+			/// 根据 特定的 volume id 找到指定 的 volume
 			if v.Id == uint32(vid) && v.ReplicaPlacement != replicaPlacementInt32 {
 				allLocations = append(allLocations, loc)
 				continue
@@ -79,8 +82,10 @@ func (c *commandVolumeConfigureReplication) Do(args []string, commandEnv *Comman
 		return fmt.Errorf("no volume needs change")
 	}
 
+	/// 遍历找到的 location
 	for _, dst := range allLocations {
 		err := operation.WithVolumeServerClient(dst.dataNode.Id, commandEnv.option.GrpcDialOption, func(volumeServerClient volume_server_pb.VolumeServerClient) error {
+			/// 配置 volume 卷, 先解挂, 再配置, 然后在挂载
 			resp, configureErr := volumeServerClient.VolumeConfigure(context.Background(), &volume_server_pb.VolumeConfigureRequest{
 				VolumeId:    uint32(vid),
 				Replication: replicaPlacement.String(),

@@ -37,6 +37,7 @@ type SubmitResult struct {
 	Error    string `json:"error,omitempty"`
 }
 
+/// 上传 文件
 func SubmitFiles(master string, grpcDialOption grpc.DialOption, files []FilePart, replication string, collection string, dataCenter string, ttl string, maxMB int, usePublicUrl bool) ([]SubmitResult, error) {
 	results := make([]SubmitResult, len(files))
 	for index, file := range files {
@@ -49,6 +50,7 @@ func SubmitFiles(master string, grpcDialOption grpc.DialOption, files []FilePart
 		DataCenter:  dataCenter,
 		Ttl:         ttl,
 	}
+	/// 分配 一批 volume id
 	ret, err := Assign(master, grpcDialOption, ar)
 	if err != nil {
 		for index := range files {
@@ -56,6 +58,7 @@ func SubmitFiles(master string, grpcDialOption grpc.DialOption, files []FilePart
 		}
 		return results, err
 	}
+	/// 上传 到 master
 	for index, file := range files {
 		file.Fid = ret.Fid
 		if index > 0 {
@@ -68,6 +71,7 @@ func SubmitFiles(master string, grpcDialOption grpc.DialOption, files []FilePart
 		file.Replication = replication
 		file.Collection = collection
 		file.DataCenter = dataCenter
+		/// 上传到 master
 		results[index].Size, err = file.Upload(maxMB, master, usePublicUrl, ret.Auth, grpcDialOption)
 		if err != nil {
 			results[index].Error = err.Error()
@@ -111,6 +115,7 @@ func newFilePart(fullPathFilename string) (ret FilePart, err error) {
 	return ret, nil
 }
 
+/// 上传 到 master
 func (fi FilePart) Upload(maxMB int, master string, usePublicUrl bool, jwt security.EncodedJwt, grpcDialOption grpc.DialOption) (retSize uint32, err error) {
 	fileUrl := "http://" + fi.Server + "/" + fi.Fid
 	if fi.ModTime != 0 {
@@ -120,6 +125,7 @@ func (fi FilePart) Upload(maxMB int, master string, usePublicUrl bool, jwt secur
 		defer closer.Close()
 	}
 	baseName := path.Base(fi.FileName)
+	/// 文件 过大 需要 分块
 	if maxMB > 0 && fi.FileSize > int64(maxMB*1024*1024) {
 		chunkSize := int64(maxMB * 1024 * 1024)
 		chunks := fi.FileSize/chunkSize + 1

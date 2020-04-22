@@ -82,12 +82,14 @@ func (vs *VolumeServer) VolumeEcShardsRebuild(ctx context.Context, req *volume_s
 		if util.FileExists(path.Join(location.Directory, baseFileName+".ecx")) {
 			// write .ec00 ~ .ec13 files
 			baseFileName = path.Join(location.Directory, baseFileName)
+			/// 重建丢失的 .ec00 ~ .ec13 files
 			if generatedShardIds, err := erasure_coding.RebuildEcFiles(baseFileName); err != nil {
 				return nil, fmt.Errorf("RebuildEcFiles %s: %v", baseFileName, err)
 			} else {
 				rebuiltShardIds = generatedShardIds
 			}
 
+			/// 将 ecxFile 中的所有 needle 都标记为删除
 			if err := erasure_coding.RebuildEcxFile(baseFileName); err != nil {
 				return nil, fmt.Errorf("RebuildEcxFile %s: %v", baseFileName, err)
 			}
@@ -102,6 +104,7 @@ func (vs *VolumeServer) VolumeEcShardsRebuild(ctx context.Context, req *volume_s
 }
 
 // VolumeEcShardsCopy copy the .ecx and some ec data slices
+/// 拷贝 .ec00 ~ .ec13 文件 .ecx 文件 .ecj 文件 .vif 文件
 func (vs *VolumeServer) VolumeEcShardsCopy(ctx context.Context, req *volume_server_pb.VolumeEcShardsCopyRequest) (*volume_server_pb.VolumeEcShardsCopyResponse, error) {
 
 	location := vs.store.FindFreeLocation()
@@ -340,6 +343,7 @@ func (vs *VolumeServer) VolumeEcShardRead(req *volume_server_pb.VolumeEcShardRea
 
 }
 
+/// 通过二分查找方法 将 needle 从 ecx 文件中标记为删除
 func (vs *VolumeServer) VolumeEcBlobDelete(ctx context.Context, req *volume_server_pb.VolumeEcBlobDeleteRequest) (*volume_server_pb.VolumeEcBlobDeleteResponse, error) {
 
 	resp := &volume_server_pb.VolumeEcBlobDeleteResponse{}
@@ -355,7 +359,7 @@ func (vs *VolumeServer) VolumeEcBlobDelete(ctx context.Context, req *volume_serv
 				return resp, nil
 			}
 
-			/// 二分查找 needle 并且 调用 MarkNeedleDeleted 将 文件标记为删除
+			/// 通过二分查找方法 将 needle 从 ecx 文件中标记为删除
 			err = localEcVolume.DeleteNeedleFromEcx(types.NeedleId(req.FileKey))
 			if err != nil {
 				return nil, err
@@ -369,6 +373,7 @@ func (vs *VolumeServer) VolumeEcBlobDelete(ctx context.Context, req *volume_serv
 }
 
 // VolumeEcShardsToVolume generates the .idx, .dat files from .ecx, .ecj and .ec01 ~ .ec14 files
+/// 从 .ec00 ~ .ec13 文件生成 .dat 文件, 从 .ecx 和 .ecj 生成 .idx 文件
 func (vs *VolumeServer) VolumeEcShardsToVolume(ctx context.Context, req *volume_server_pb.VolumeEcShardsToVolumeRequest) (*volume_server_pb.VolumeEcShardsToVolumeResponse, error) {
 
 	v, found := vs.store.FindEcVolume(needle.VolumeId(req.VolumeId))

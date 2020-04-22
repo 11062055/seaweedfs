@@ -6,6 +6,7 @@ import (
 	"fmt"
 )
 
+///
 type OffsetHigher struct {
 	// b4 byte
 }

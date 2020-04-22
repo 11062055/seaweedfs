@@ -5,6 +5,7 @@ import (
 	"strconv"
 )
 
+/// 内存映射相关 目前只有 windows 才用
 type MemoryBuffer struct {
 	aligned_length uint64
 	length         uint64

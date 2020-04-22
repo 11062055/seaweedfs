@@ -25,6 +25,7 @@ var (
 	}
 )
 
+/// 通过二分查找方法 将 needle 从 ecx 文件中标记为删除
 func (ev *EcVolume) DeleteNeedleFromEcx(needleId types.NeedleId) (err error) {
 
 	/// 二分查找 needle 并且 调用 MarkNeedleDeleted 将 文件标记为删除
@@ -50,6 +51,7 @@ func (ev *EcVolume) DeleteNeedleFromEcx(needleId types.NeedleId) (err error) {
 	return
 }
 
+/// 将 ecxFile 中的所有 needle 都标记为删除
 func RebuildEcxFile(baseFileName string) error {
 
 	if !util.FileExists(baseFileName + ".ecj") {
@@ -75,7 +77,9 @@ func RebuildEcxFile(baseFileName string) error {
 	}
 
 	buf := make([]byte, types.NeedleIdSize)
+	/// 将 ecxFile 中的所有 needle 都标记为删除
 	for {
+		/// 从 ecj 文件中获取 needleid
 		n, _ := ecjFile.Read(buf)
 		if n != types.NeedleIdSize {
 			break
@@ -83,6 +87,7 @@ func RebuildEcxFile(baseFileName string) error {
 
 		needleId := types.BytesToNeedleId(buf)
 
+		/// 二分查找 .ecx 文件 获取 needle 如果找到则调用 MarkNeedleDeleted 将文件对应位置 offset 的值改为 TombstoneFileSize 即删除
 		_, _, err = SearchNeedleFromSortedIndex(ecxFile, ecxFileSize, needleId, MarkNeedleDeleted)
 
 		if err != nil && err != NotFoundError {
@@ -92,8 +97,10 @@ func RebuildEcxFile(baseFileName string) error {
 
 	}
 
+	/// 之后关闭 ecx 文件
 	ecxFile.Close()
 
+	/// 之后再将 ecj 删除
 	os.Remove(baseFileName + ".ecj")
 
 	return nil

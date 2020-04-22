@@ -8,6 +8,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/pb/volume_server_pb"
 )
 
+/// 读取系统 内存 信息
 func fillInMemStatus(mem *volume_server_pb.MemStatus) {
 	//system memory usage
 	sysInfo := new(syscall.Sysinfo_t)

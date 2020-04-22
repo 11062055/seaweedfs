@@ -7,6 +7,7 @@ import (
 	"os"
 )
 
+/// 内存映射 尚未实现
 func (mMap *MemoryMap) CreateMemoryMap(file *os.File, maxLength uint64) {
 }
 

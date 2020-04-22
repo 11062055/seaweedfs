@@ -11,12 +11,14 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/util"
 )
 
+/// 获取 volume 文件 即读取并且发送文件内容
 func (vs *VolumeServer) FileGet(req *volume_server_pb.FileGetRequest, stream volume_server_pb.VolumeServer_FileGetServer) error {
 
 	headResponse := &volume_server_pb.FileGetResponse{}
 	n := new(needle.Needle)
 
 	commaIndex := strings.LastIndex(req.FileId, ",")
+	/// 获取 volume id 和 file id
 	vid := req.FileId[:commaIndex]
 	fid := req.FileId[commaIndex+1:]
 
@@ -39,6 +41,7 @@ func (vs *VolumeServer) FileGet(req *volume_server_pb.FileGetRequest, stream vol
 		return stream.Send(headResponse)
 	}
 
+	/// 检查 cookie
 	cookie := n.Cookie
 	var count int
 	if hasVolume {
@@ -98,14 +101,17 @@ func (vs *VolumeServer) FileGet(req *volume_server_pb.FileGetRequest, stream vol
 		}
 	}
 
+	/// 得到总长度 和 每次读取的长度 缺点是所有数据都读取到内存中
 	headResponse.ContentLength = uint32(len(n.Data))
 	bytesToRead := len(n.Data)
 	bytesRead := 0
 
 	t := headResponse
 
+	/// 循环写入数据 并且发送
 	for bytesRead < bytesToRead {
 
+		/// 每次读取 BufferSizeLimit 字节的数据
 		stopIndex := bytesRead + BufferSizeLimit
 		if stopIndex > bytesToRead {
 			stopIndex = bytesToRead

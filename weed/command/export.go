@@ -103,6 +103,7 @@ func (scanner *VolumeFileScanner4Export) ReadNeedleBody() bool {
 	return true
 }
 
+/// 导出 或者 打印 needle 信息
 func (scanner *VolumeFileScanner4Export) VisitNeedle(n *needle.Needle, offset int64, needleHeader, needleBody []byte) error {
 	needleMap := scanner.needleMap
 	vid := scanner.vid
@@ -197,10 +198,12 @@ func runExport(cmd *Command, args []string) bool {
 	needleMap := needle_map.NewMemDb()
 	defer needleMap.Close()
 
+	/// 加载 .idx 文件
 	if err := needleMap.LoadFromIdx(path.Join(*export.dir, fileName+".idx")); err != nil {
 		glog.Fatalf("cannot load needle map from %s.idx: %s", fileName, err)
 	}
 
+	/// 打印 needle 信息 或者 从 .dat 文件 导出 volume 数据 并且 压缩
 	volumeFileScanner := &VolumeFileScanner4Export{
 		needleMap: needleMap,
 		vid:       vid,
@@ -210,6 +213,7 @@ func runExport(cmd *Command, args []string) bool {
 		fmt.Printf("key\tname\tsize\tgzip\tmime\tmodified\tttl\tdeleted\n")
 	}
 
+	/// 遍历 加载 到 needle map 中 的 .idx 文件, 并且 用 VolumeFileScanner4Export 打印 needle 信息 或者 从 .dat 文件 导出 volume 数据 并且 压缩
 	err = storage.ScanVolumeFile(*export.dir, *export.collection, vid, storage.NeedleMapInMemory, volumeFileScanner)
 	if err != nil && err != io.EOF {
 		glog.Fatalf("Export Volume File [ERROR] %s\n", err)

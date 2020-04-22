@@ -8,6 +8,7 @@ type Interval struct {
 	LargeBlockRowsCount int
 }
 
+/// 定位 ec shard
 func LocateData(largeBlockLength, smallBlockLength int64, datSize int64, offset int64, size uint32) (intervals []Interval) {
 	blockIndex, isLargeBlock, innerBlockOffset := locateOffset(largeBlockLength, smallBlockLength, datSize, offset)
 

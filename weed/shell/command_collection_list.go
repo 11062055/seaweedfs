@@ -39,6 +39,7 @@ func (c *commandCollectionList) Do(args []string, commandEnv *CommandEnv, writer
 	return nil
 }
 
+/// 列出所有 的 collection
 func ListCollectionNames(commandEnv *CommandEnv, includeNormalVolumes, includeEcVolumes bool) (collections []string, err error) {
 	var resp *master_pb.CollectionListResponse
 	err = commandEnv.MasterClient.WithClient(func(client master_pb.SeaweedClient) error {

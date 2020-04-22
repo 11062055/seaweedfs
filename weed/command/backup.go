@@ -61,6 +61,7 @@ var cmdBackup = &Command{
   `,
 }
 
+/// 增量 复制 一个 volume 到 本地 目录
 func runBackup(cmd *Command, args []string) bool {
 
 	util.LoadConfiguration("security", false)
@@ -79,6 +80,7 @@ func runBackup(cmd *Command, args []string) bool {
 	}
 	volumeServer := lookup.Locations[0].Url
 
+	/// 从 远端 volume server 获取 volume 的 同步 状态 TailOffset
 	stats, err := operation.GetVolumeSyncStatus(volumeServer, grpcDialOption, uint32(vid))
 	if err != nil {
 		fmt.Printf("Error get volume %d status: %v\n", vid, err)
@@ -112,6 +114,7 @@ func runBackup(cmd *Command, args []string) bool {
 			return true
 		}
 	}
+	/// 参数设置 并且加载(或创建) 本地 的 .dat 文件
 	v, err := storage.NewVolume(*s.dir, *s.collection, vid, storage.NeedleMapInMemory, replication, ttl, 0, 0)
 	if err != nil {
 		fmt.Printf("Error creating or reading from volume %d: %v\n", vid, err)
@@ -119,10 +122,12 @@ func runBackup(cmd *Command, args []string) bool {
 	}
 
 	if v.SuperBlock.CompactionRevision < uint16(stats.CompactRevision) {
+		/// 复制方式 进行回收 垃圾文件 压缩回收
 		if err = v.Compact2(30*1024*1024*1024, 0); err != nil {
 			fmt.Printf("Compact Volume before synchronizing %v\n", err)
 			return true
 		}
+		/// 提交 回收, 实际 是 将 临时 的 复制 文件 进行 rename
 		if err = v.CommitCompact(); err != nil {
 			fmt.Printf("Commit Compact before synchronizing %v\n", err)
 			return true
@@ -145,6 +150,7 @@ func runBackup(cmd *Command, args []string) bool {
 	}
 	defer v.Close()
 
+	/// 从远端 volume server 增量 备份 数据 到 本地
 	if err := v.IncrementalBackup(volumeServer, grpcDialOption); err != nil {
 		fmt.Printf("Error synchronizing volume %d: %v\n", vid, err)
 		return true

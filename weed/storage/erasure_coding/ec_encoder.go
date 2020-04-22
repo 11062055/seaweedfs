@@ -62,8 +62,9 @@ func WriteEcFiles(baseFileName string) error {
 	return generateEcFiles(baseFileName, 256*1024, ErasureCodingLargeBlockSize, ErasureCodingSmallBlockSize)
 }
 
+/// 重建丢失的 .ec00 ~ .ec13 files
 func RebuildEcFiles(baseFileName string) ([]uint32, error) {
-	qreturn generateMissingEcFiles(baseFileName, 256*1024, ErasureCodingLargeBlockSize, ErasureCodingSmallBlockSize)
+	return generateMissingEcFiles(baseFileName, 256*1024, ErasureCodingLargeBlockSize, ErasureCodingSmallBlockSize)
 }
 
 func ToExt(ecIndex int) string {

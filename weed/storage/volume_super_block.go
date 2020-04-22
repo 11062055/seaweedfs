@@ -17,6 +17,7 @@ func (v *Volume) maybeWriteSuperBlock() error {
 		glog.V(0).Infof("failed to stat datafile %s: %v", v.DataBackend.Name(), e)
 		return e
 	}
+	/// 超级块 信息 一定 是写到文件 开始处的
 	if datSize == 0 {
 		v.SuperBlock.Version = needle.CurrentVersion
 		_, e = v.DataBackend.WriteAt(v.SuperBlock.Bytes(), 0)
@@ -36,6 +37,7 @@ func (v *Volume) maybeWriteSuperBlock() error {
 }
 
 func (v *Volume) readSuperBlock() (err error) {
+	/// 从文件中读取超级块 信息
 	v.SuperBlock, err = super_block.ReadSuperBlock(v.DataBackend)
 	if v.volumeInfo != nil && v.volumeInfo.Replication != "" {
 		if replication, err := super_block.NewReplicaPlacementFromString(v.volumeInfo.Replication); err != nil {

@@ -128,6 +128,7 @@ func runBenchmark(cmd *Command, args []string) bool {
 	}
 
 	b.masterClient = wdclient.NewMasterClient(b.grpcDialOption, "client", 0, strings.Split(*b.masters, ","))
+	/// master 之间保持连接 循环 更新 volume id 到 location 之间的对应关系
 	go b.masterClient.KeepConnectedToMaster()
 	b.masterClient.WaitUntilConnected()
 

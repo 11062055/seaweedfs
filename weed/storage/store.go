@@ -321,6 +321,7 @@ func (s *Store) HasVolume(i needle.VolumeId) bool {
 	return v != nil
 }
 
+/// 标记为只读
 func (s *Store) MarkVolumeReadonly(i needle.VolumeId) error {
 	v := s.findVolume(i)
 	if v == nil {
@@ -403,6 +404,7 @@ func (s *Store) DeleteVolume(i needle.VolumeId) error {
 	return fmt.Errorf("volume %d not found on disk", i)
 }
 
+/// 配置 volume
 func (s *Store) ConfigureVolume(i needle.VolumeId, replication string) error {
 
 	for _, location := range s.Locations {

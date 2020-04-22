@@ -12,6 +12,7 @@ import (
 
 type CipherKey []byte
 
+/// AES 加解密 相关
 func GenCipherKey() CipherKey {
 	key := make([]byte, 32)
 	if _, err := io.ReadFull(rand.Reader, key); err != nil {

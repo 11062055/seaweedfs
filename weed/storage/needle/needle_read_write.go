@@ -150,8 +150,10 @@ func (n *Needle) Append(w backend.BackendStorageFile, version Version) (offset u
 	return offset, size, actualSize, err
 }
 
+/// 读取 一个 needle 块, 包括 header \ data \ checksum \ append at ns
 func ReadNeedleBlob(r backend.BackendStorageFile, offset int64, size uint32, version Version) (dataSlice []byte, err error) {
 
+	/// 读取 一个 needle 块, 包括 header \ data \ checksum \ append at ns \ padding 等
 	dataSize := GetActualSize(size, version)
 	dataSlice = make([]byte, int(dataSize))
 
@@ -161,6 +163,7 @@ func ReadNeedleBlob(r backend.BackendStorageFile, offset int64, size uint32, ver
 }
 
 // ReadBytes hydrates the needle from the bytes buffer, with only n.Id is set.
+/// 从字节数组中 解析出 header \ data \ checksum \ append at ns, 并进行 crc32 校验
 func (n *Needle) ReadBytes(bytes []byte, offset int64, size uint32, version Version) (err error) {
 	n.ParseNeedleHeader(bytes)
 	if n.Size != size {
@@ -191,11 +194,14 @@ func (n *Needle) ReadBytes(bytes []byte, offset int64, size uint32, version Vers
 }
 
 // ReadData hydrates the needle from the file, with only n.Id is set.
+/// 读取 一个 needle 块, 包括 header \ data \ checksum \ append at ns
 func (n *Needle) ReadData(r backend.BackendStorageFile, offset int64, size uint32, version Version) (err error) {
+	/// 读取 一个 needle 块, 包括 header \ data \ checksum \ append at ns
 	bytes, err := ReadNeedleBlob(r, offset, size, version)
 	if err != nil {
 		return err
 	}
+	/// 从字节数组中 解析出 header \ data \ checksum \ append at ns, 并进行 crc32 校验
 	return n.ReadBytes(bytes, offset, size, version)
 }
 
@@ -266,6 +272,7 @@ func (n *Needle) readNeedleDataVersion2(bytes []byte) (err error) {
 	return nil
 }
 
+/// 读取 needle header
 func ReadNeedleHeader(r backend.BackendStorageFile, version Version, offset int64) (n *Needle, bytes []byte, bodyLength int64, err error) {
 	n = new(Needle)
 	if version == Version1 || version == Version2 || version == Version3 {

@@ -18,6 +18,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/glog"
 )
 
+/// volume 的 详细 信息 包括基础 信息 和 用于存储 数据 的 DataBackend \ 用于存储 .idx 文件 的 needle map \ 超级块中的副本类型和ttl等
 type Volume struct {
 	Id                 needle.VolumeId
 	dir                string
@@ -44,6 +45,7 @@ type Volume struct {
 	volumeInfo *volume_server_pb.VolumeInfo
 }
 
+/// 参数设置 并且加载 本地 或者 remote 的 .dat 文件
 func NewVolume(dirname string, collection string, id needle.VolumeId, needleMapKind NeedleMapType, replicaPlacement *super_block.ReplicaPlacement, ttl *needle.TTL, preallocate int64, memoryMapMaxSizeMb uint32) (v *Volume, e error) {
 	// if replicaPlacement is nil, the superblock will be loaded from disk
 	v = &Volume{dir: dirname, Collection: collection, Id: id, MemoryMapMaxSizeMb: memoryMapMaxSizeMb}
@@ -169,6 +171,7 @@ func (v *Volume) NeedToReplicate() bool {
 // except when volume is empty
 // or when the volume does not have a ttl
 // or when volumeSizeLimit is 0 when server just starts
+/// 检查 volume 是否已经 过期
 func (v *Volume) expired(volumeSizeLimit uint64) bool {
 	if volumeSizeLimit == 0 {
 		//skip if we don't know size limit
@@ -190,6 +193,7 @@ func (v *Volume) expired(volumeSizeLimit uint64) bool {
 }
 
 // wait either maxDelayMinutes or 10% of ttl minutes
+/// 1.1 倍超时时间 是否 已经 过了
 func (v *Volume) expiredLongEnough(maxDelayMinutes uint32) bool {
 	if v.Ttl == nil || v.Ttl.Minutes() == 0 {
 		return false

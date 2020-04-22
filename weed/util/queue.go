@@ -7,6 +7,7 @@ type node struct {
 	next *node
 }
 
+/// 封装 的 一个 链表 实现 的 泛型 Queue, 线程安全
 type Queue struct {
 	head  *node
 	tail  *node

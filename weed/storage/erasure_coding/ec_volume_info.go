@@ -6,6 +6,7 @@ import (
 )
 
 // data structure used in master
+/// type ShardBits uint32 as shard id, 每一位代表 一个 shard
 type EcVolumeInfo struct {
 	VolumeId   needle.VolumeId
 	Collection string

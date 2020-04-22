@@ -17,6 +17,7 @@ var (
 	historyPath = path.Join(os.TempDir(), "weed-shell")
 )
 
+/// 以 shell  的 方式 执行 所有 命令
 func RunShell(options ShellOptions) {
 
 	line = liner.NewLiner()

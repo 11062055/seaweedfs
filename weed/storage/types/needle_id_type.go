@@ -6,6 +6,7 @@ import (
 	"strconv"
 )
 
+/// needle id 实际就是 无符号 64 位 整数
 type NeedleId uint64
 
 const (

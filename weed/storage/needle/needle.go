@@ -139,6 +139,8 @@ func (n *Needle) ParsePath(fid string) (err error) {
 	return err
 }
 
+/// 从 字符串 中反解出 needle id 和 cookie ,CookieSize = 4, 最后 8 个字节 是 cookie
+/// needle id 和 cookie 实际是 64 位 和 32 位 的 无符号 整型
 func ParseNeedleIdCookie(key_hash_string string) (NeedleId, Cookie, error) {
 	if len(key_hash_string) <= CookieSize*2 {
 		return NeedleIdEmpty, 0, fmt.Errorf("KeyHash is too short.")
@@ -147,6 +149,7 @@ func ParseNeedleIdCookie(key_hash_string string) (NeedleId, Cookie, error) {
 		return NeedleIdEmpty, 0, fmt.Errorf("KeyHash is too long.")
 	}
 	split := len(key_hash_string) - CookieSize*2
+	/// needle id 实际是 64 位 无符号 整型
 	needleId, err := ParseNeedleId(key_hash_string[:split])
 	if err != nil {
 		return NeedleIdEmpty, 0, fmt.Errorf("Parse needleId error: %v", err)

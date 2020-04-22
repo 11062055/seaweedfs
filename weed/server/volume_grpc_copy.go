@@ -20,18 +20,22 @@ import (
 const BufferSizeLimit = 1024 * 1024 * 2
 
 // VolumeCopy copy the .idx .dat .vif files, and mount the volume
+/// 从目标地址拷贝数据到本地 .idx .dat .vif
 func (vs *VolumeServer) VolumeCopy(ctx context.Context, req *volume_server_pb.VolumeCopyRequest) (*volume_server_pb.VolumeCopyResponse, error) {
 
 	v := vs.store.GetVolume(needle.VolumeId(req.VolumeId))
+	/// 本地已经存在
 	if v != nil {
 
 		glog.V(0).Infof("volume %d already exists. deleted before copying...", req.VolumeId)
 
+		/// 先解挂
 		err := vs.store.UnmountVolume(needle.VolumeId(req.VolumeId))
 		if err != nil {
 			return nil, fmt.Errorf("failed to mount existing volume %d: %v", req.VolumeId, err)
 		}
 
+		/// 再删除
 		err = vs.store.DeleteVolume(needle.VolumeId(req.VolumeId))
 		if err != nil {
 			return nil, fmt.Errorf("failed to delete existing volume %d: %v", req.VolumeId, err)
@@ -40,6 +44,7 @@ func (vs *VolumeServer) VolumeCopy(ctx context.Context, req *volume_server_pb.Vo
 		glog.V(0).Infof("deleted exisitng volume %d before copying.", req.VolumeId)
 	}
 
+	/// 找到空闲 location
 	location := vs.store.FindFreeLocation()
 	if location == nil {
 		return nil, fmt.Errorf("no space left")
@@ -53,6 +58,7 @@ func (vs *VolumeServer) VolumeCopy(ctx context.Context, req *volume_server_pb.Vo
 	//   confirm size and timestamp
 	var volFileInfoResp *volume_server_pb.ReadVolumeFileStatusResponse
 	var volumeFileName, idxFileName, datFileName string
+	/// 进行远程调用
 	err := operation.WithVolumeServerClient(req.SourceDataNode, vs.grpcDialOption, func(client volume_server_pb.VolumeServerClient) error {
 		var err error
 		volFileInfoResp, err = client.ReadVolumeFileStatus(context.Background(),
@@ -102,6 +108,7 @@ func (vs *VolumeServer) VolumeCopy(ctx context.Context, req *volume_server_pb.Vo
 	}
 
 	// mount the volume
+	/// 挂载卷 volume
 	err = vs.store.MountVolume(needle.VolumeId(req.VolumeId))
 	if err != nil {
 		return nil, fmt.Errorf("failed to mount volume %d: %v", req.VolumeId, err)
@@ -177,6 +184,7 @@ func writeToFile(client volume_server_pb.VolumeServer_CopyFileClient, fileName s
 	defer dst.Close()
 
 	for {
+		/// 从 client 处循环接收
 		resp, receiveErr := client.Recv()
 		if receiveErr == io.EOF {
 			break
@@ -184,12 +192,14 @@ func writeToFile(client volume_server_pb.VolumeServer_CopyFileClient, fileName s
 		if receiveErr != nil {
 			return fmt.Errorf("receiving %s: %v", fileName, receiveErr)
 		}
+		/// 写入文件中去
 		dst.Write(resp.FileContent)
 		wt.MaybeSlowdown(int64(len(resp.FileContent)))
 	}
 	return nil
 }
 
+/// 获取卷文件状态
 func (vs *VolumeServer) ReadVolumeFileStatus(ctx context.Context, req *volume_server_pb.ReadVolumeFileStatusRequest) (*volume_server_pb.ReadVolumeFileStatusResponse, error) {
 	resp := &volume_server_pb.ReadVolumeFileStatusResponse{}
 	v := vs.store.GetVolume(needle.VolumeId(req.VolumeId))
@@ -212,6 +222,7 @@ func (vs *VolumeServer) ReadVolumeFileStatus(ctx context.Context, req *volume_se
 // CopyFile client pulls the volume related file from the source server.
 // if req.CompactionRevision != math.MaxUint32, it ensures the compact revision is as expected
 // The copying still stop at req.StopOffset, but you can set it to math.MaxUint64 in order to read all data.
+/// 拷贝文件 给 调用方
 func (vs *VolumeServer) CopyFile(req *volume_server_pb.CopyFileRequest, stream volume_server_pb.VolumeServer_CopyFileServer) error {
 
 	var fileName string
@@ -224,8 +235,10 @@ func (vs *VolumeServer) CopyFile(req *volume_server_pb.CopyFileRequest, stream v
 		if uint32(v.CompactionRevision) != req.CompactionRevision && req.CompactionRevision != math.MaxUint32 {
 			return fmt.Errorf("volume %d is compacted", req.VolumeId)
 		}
+		/// 获取 要 拷贝的文件 名称
 		fileName = v.FileName() + req.Ext
 	} else {
+		/// 获取 要 拷贝的文件 名称
 		baseFileName := erasure_coding.EcShardBaseFileName(req.Collection, int(req.VolumeId)) + req.Ext
 		for _, location := range vs.store.Locations {
 			tName := util.Join(location.Directory, baseFileName)
@@ -241,6 +254,7 @@ func (vs *VolumeServer) CopyFile(req *volume_server_pb.CopyFileRequest, stream v
 		}
 	}
 
+	/// 获取 要 读取 的 字节大小
 	bytesToRead := int64(req.StopOffset)
 
 	file, err := os.Open(fileName)
@@ -254,6 +268,7 @@ func (vs *VolumeServer) CopyFile(req *volume_server_pb.CopyFileRequest, stream v
 
 	buffer := make([]byte, BufferSizeLimit)
 
+	/// 每次读取 BufferSizeLimit 字节的数据
 	for bytesToRead > 0 {
 		bytesread, err := file.Read(buffer)
 

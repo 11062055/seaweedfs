@@ -15,6 +15,7 @@ import (
 )
 
 // MaybeLoadVolumeInfo load the file data as *volume_server_pb.VolumeInfo, the returned volumeInfo will not be nil
+/// 将文件 .vif 中的 数据 读出来 并且 解析为 VolumeInfo
 func MaybeLoadVolumeInfo(fileName string) (*volume_server_pb.VolumeInfo, bool, error) {
 
 	volumeInfo := &volume_server_pb.VolumeInfo{}

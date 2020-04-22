@@ -8,6 +8,7 @@ import (
 	. "github.com/chrislusf/seaweedfs/weed/storage/types"
 )
 
+/// volume 下 的 needle file id, volume id 实际是 32 位无符号整型, needle id 和 cookie 分别是 无符号的 64 位 和 32 位 整数
 type FileId struct {
 	VolumeId VolumeId
 	Key      NeedleId
@@ -28,11 +29,13 @@ func ParseFileIdFromString(fid string) (*FileId, error) {
 	if err != nil {
 		return nil, err
 	}
+	/// volume id 实际是 32 位无符号整型
 	volumeId, err := NewVolumeId(vid)
 	if err != nil {
 		return nil, err
 	}
 
+	/// needle id 和 cookie 分别是 无符号的 64 位 和 32 位 整数
 	nid, cookie, err := ParseNeedleIdCookie(needleKeyCookie)
 	if err != nil {
 		return nil, err
@@ -72,6 +75,7 @@ func formatNeedleIdCookie(key NeedleId, cookie Cookie) string {
 }
 
 // copied from operation/delete_content.go, to cut off cycle dependency
+/// 形如 逗号分隔的 [volume id,needle id and cookie]
 func splitVolumeId(fid string) (vid string, key_cookie string, err error) {
 	commaIndex := strings.Index(fid, ",")
 	if commaIndex <= 0 {

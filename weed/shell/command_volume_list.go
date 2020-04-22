@@ -29,6 +29,7 @@ func (c *commandVolumeList) Help() string {
 `
 }
 
+/// 按层次 输出 如下信息 Topology -> Data Center -> Rack -> Data Node -> Volume \ Ec Shard
 func (c *commandVolumeList) Do(args []string, commandEnv *CommandEnv, writer io.Writer) (err error) {
 
 	var resp *master_pb.VolumeListResponse

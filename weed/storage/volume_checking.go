@@ -13,6 +13,7 @@ import (
 
 func CheckVolumeDataIntegrity(v *Volume, indexFile *os.File) (lastAppendAtNs uint64, e error) {
 	var indexSize int64
+	/// .idx 文件 大小 必须 是 NeedleMapEntrySize 的 整数倍
 	if indexSize, e = verifyIndexFileIntegrity(indexFile); e != nil {
 		return 0, fmt.Errorf("verifyIndexFileIntegrity %s failed: %v", indexFile.Name(), e)
 	}
@@ -20,6 +21,7 @@ func CheckVolumeDataIntegrity(v *Volume, indexFile *os.File) (lastAppendAtNs uin
 		return 0, nil
 	}
 	var lastIdxEntry []byte
+	/// 读取 偏移量 处的 一条 数据
 	if lastIdxEntry, e = readIndexEntryAtOffset(indexFile, indexSize-NeedleMapEntrySize); e != nil {
 		return 0, fmt.Errorf("readLastIndexEntry %s failed: %v", indexFile.Name(), e)
 	}
@@ -30,12 +32,14 @@ func CheckVolumeDataIntegrity(v *Volume, indexFile *os.File) (lastAppendAtNs uin
 	if size == TombstoneFileSize {
 		size = 0
 	}
+	/// 读取 一个 needle 块, 包括 header \ data \ checksum \ append at ns, 并进行 crc32 校验
 	if lastAppendAtNs, e = verifyNeedleIntegrity(v.DataBackend, v.Version(), offset.ToAcutalOffset(), key, size); e != nil {
 		return lastAppendAtNs, fmt.Errorf("verifyNeedleIntegrity %s failed: %v", indexFile.Name(), e)
 	}
 	return
 }
 
+/// .idx 文件 大小 必须 是 NeedleMapEntrySize 的 整数倍
 func verifyIndexFileIntegrity(indexFile *os.File) (indexSize int64, err error) {
 	if indexSize, err = util.GetFileSize(indexFile); err == nil {
 		if indexSize%NeedleMapEntrySize != 0 {
@@ -45,6 +49,7 @@ func verifyIndexFileIntegrity(indexFile *os.File) (indexSize int64, err error) {
 	return
 }
 
+/// 读取 偏移量 处的 一条 数据
 func readIndexEntryAtOffset(indexFile *os.File, offset int64) (bytes []byte, err error) {
 	if offset < 0 {
 		err = fmt.Errorf("offset %d for index file is invalid", offset)
@@ -55,8 +60,10 @@ func readIndexEntryAtOffset(indexFile *os.File, offset int64) (bytes []byte, err
 	return
 }
 
+/// 读取 一个 needle 块, 包括 header \ data \ checksum \ append at ns, 并进行 crc32 校验
 func verifyNeedleIntegrity(datFile backend.BackendStorageFile, v needle.Version, offset int64, key NeedleId, size uint32) (lastAppendAtNs uint64, err error) {
 	n := new(needle.Needle)
+	/// 读取 一个 needle 块, 包括 header \ data \ checksum \ append at ns, 并进行 crc32 校验
 	if err = n.ReadData(datFile, offset, size, v); err != nil {
 		return n.AppendAtNs, fmt.Errorf("read data [%d,%d) : %v", offset, offset+int64(size), err)
 	}

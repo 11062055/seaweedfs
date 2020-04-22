@@ -16,6 +16,7 @@ type Configuration interface {
 	SetDefault(key string, value interface{})
 }
 
+/// 获取配置
 func LoadConfiguration(configFileName string, required bool) (loaded bool) {
 
 	// find a filer store

@@ -8,6 +8,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/glog"
 )
 
+/// 创建 volume 文件
 func CreateVolumeFile(fileName string, preallocate int64, memoryMapSizeMB uint32) (BackendStorageFile, error) {
 	file, e := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if e != nil {
