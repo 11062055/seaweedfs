@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/karlseguin/ccache"
 	"google.golang.org/grpc"
 
+	"github.com/chrislusf/seaweedfs/weed/filesys/meta_cache"
 	"github.com/chrislusf/seaweedfs/weed/glog"
 	"github.com/chrislusf/seaweedfs/weed/pb"
 	"github.com/chrislusf/seaweedfs/weed/pb/filer_pb"
@@ -44,6 +46,7 @@ type Option struct {
 
 	OutsideContainerClusterMode bool // whether the mount runs outside SeaweedFS containers
 	Cipher                      bool // whether encrypt data on volume server
+	AsyncMetaDataCaching        bool // whether asynchronously cache meta data
 
 }
 
@@ -66,6 +69,7 @@ type WFS struct {
 	fsNodeCache *FsCache
 
 	chunkCache *chunk_cache.ChunkCache
+	metaCache  *meta_cache.MetaCache
 }
 type statsCache struct {
 	filer_pb.StatisticsResponse
@@ -84,10 +88,21 @@ func NewSeaweedFileSystem(option *Option) *WFS {
 		},
 	}
 	if option.CacheSizeMB > 0 {
-		wfs.chunkCache = chunk_cache.NewChunkCache(256, option.CacheDir, option.CacheSizeMB, 4)
+		wfs.chunkCache = chunk_cache.NewChunkCache(256, option.CacheDir, option.CacheSizeMB)
 		util.OnInterrupt(func() {
 			wfs.chunkCache.Shutdown()
 		})
+	}
+	if wfs.option.AsyncMetaDataCaching {
+		wfs.metaCache = meta_cache.NewMetaCache(path.Join(option.CacheDir, "meta"))
+		if err := meta_cache.InitMetaCache(wfs.metaCache, wfs, wfs.option.FilerMountRootPath); err != nil{
+			glog.V(0).Infof("failed to init meta cache: %v", err)
+		} else {
+			go meta_cache.SubscribeMetaEvents(wfs.metaCache, wfs, wfs.option.FilerMountRootPath)
+			util.OnInterrupt(func() {
+				wfs.metaCache.Shutdown()
+			})
+		}
 	}
 
 	wfs.root = &Dir{name: wfs.option.FilerMountRootPath, wfs: wfs}

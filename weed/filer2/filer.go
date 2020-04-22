@@ -35,19 +35,19 @@ type Filer struct {
 	FsyncBuckets        []string
 	buckets             *FilerBuckets
 	Cipher              bool
-	metaLogBuffer       *log_buffer.LogBuffer
+	MetaLogBuffer       *log_buffer.LogBuffer
 	metaLogCollection   string
 	metaLogReplication  string
 }
 
-func NewFiler(masters []string, grpcDialOption grpc.DialOption, filerGrpcPort uint32, collection string, replication string, notifyFn func()) *Filer {
+func NewFiler(masters []string, grpcDialOption grpc.DialOption, filerHost string, filerGrpcPort uint32, collection string, replication string, notifyFn func()) *Filer {
 	f := &Filer{
 		directoryCache:      ccache.New(ccache.Configure().MaxSize(1000).ItemsToPrune(100)),
-		MasterClient:        wdclient.NewMasterClient(grpcDialOption, "filer", filerGrpcPort, masters),
+		MasterClient:        wdclient.NewMasterClient(grpcDialOption, "filer", filerHost, filerGrpcPort, masters),
 		fileIdDeletionQueue: util.NewUnboundedQueue(),
 		GrpcDialOption:      grpcDialOption,
 	}
-	f.metaLogBuffer = log_buffer.NewLogBuffer(time.Minute, f.logFlushFunc, notifyFn)
+	f.MetaLogBuffer = log_buffer.NewLogBuffer(time.Minute, f.logFlushFunc, notifyFn)
 	f.metaLogCollection = collection
 	f.metaLogReplication = replication
 
@@ -316,6 +316,6 @@ func (f *Filer) cacheSetDirectory(dirpath string, dirEntry *Entry, level int) {
 }
 
 func (f *Filer) Shutdown() {
-	f.metaLogBuffer.Shutdown()
+	f.MetaLogBuffer.Shutdown()
 	f.store.Shutdown()
 }

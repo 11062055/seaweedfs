@@ -1,52 +1,39 @@
 package chunk_cache
 
 import (
-	"fmt"
-	"path"
-	"sort"
 	"sync"
 
 	"github.com/chrislusf/seaweedfs/weed/glog"
-	"github.com/chrislusf/seaweedfs/weed/storage"
 	"github.com/chrislusf/seaweedfs/weed/storage/needle"
+)
+
+const (
+	memCacheSizeLimit     = 1024 * 1024
+	onDiskCacheSizeLimit0 = memCacheSizeLimit
+	onDiskCacheSizeLimit1 = 4 * memCacheSizeLimit
 )
 
 // a global cache for recently accessed file chunks
 type ChunkCache struct {
 	memCache   *ChunkCacheInMemory
-	diskCaches []*ChunkCacheVolume
+	diskCaches []*OnDiskCacheLayer
 	sync.RWMutex
 }
 
-func NewChunkCache(maxEntries int64, dir string, diskSizeMB int64, segmentCount int) *ChunkCache {
+func NewChunkCache(maxEntries int64, dir string, diskSizeMB int64) *ChunkCache {
+
 	c := &ChunkCache{
 		memCache: NewChunkCacheInMemory(maxEntries),
 	}
-
-	volumeCount, volumeSize := int(diskSizeMB/30000), int64(30000)
-	if volumeCount < segmentCount {
-		volumeCount, volumeSize = segmentCount, diskSizeMB/int64(segmentCount)
-	}
-
-	for i := 0; i < volumeCount; i++ {
-		fileName := path.Join(dir, fmt.Sprintf("cache_%d", i))
-		diskCache, err := LoadOrCreateChunkCacheVolume(fileName, volumeSize*1024*1024)
-		if err != nil {
-			glog.Errorf("failed to add cache %s : %v", fileName, err)
-		} else {
-			c.diskCaches = append(c.diskCaches, diskCache)
-		}
-	}
-
-	// keep newest cache to the front
-	sort.Slice(c.diskCaches, func(i, j int) bool {
-		return c.diskCaches[i].lastModTime.After(c.diskCaches[j].lastModTime)
-	})
+	c.diskCaches = make([]*OnDiskCacheLayer, 3)
+	c.diskCaches[0] = NewOnDiskCacheLayer(dir, "c0_1", diskSizeMB/4, 4)
+	c.diskCaches[1] = NewOnDiskCacheLayer(dir, "c1_4", diskSizeMB/4, 4)
+	c.diskCaches[2] = NewOnDiskCacheLayer(dir, "cache", diskSizeMB/2, 4)
 
 	return c
 }
 
-func (c *ChunkCache) GetChunk(fileId string) (data []byte) {
+func (c *ChunkCache) GetChunk(fileId string, chunkSize uint64) (data []byte) {
 	if c == nil {
 		return
 	}
@@ -54,12 +41,15 @@ func (c *ChunkCache) GetChunk(fileId string) (data []byte) {
 	c.RLock()
 	defer c.RUnlock()
 
-	return c.doGetChunk(fileId)
+	return c.doGetChunk(fileId, chunkSize)
 }
 
-func (c *ChunkCache) doGetChunk(fileId string) (data []byte) {
-	if data = c.memCache.GetChunk(fileId); data != nil {
-		return data
+func (c *ChunkCache) doGetChunk(fileId string, chunkSize uint64) (data []byte) {
+
+	if chunkSize < memCacheSizeLimit {
+		if data = c.memCache.GetChunk(fileId); data != nil {
+			return data
+		}
 	}
 
 	fid, err := needle.ParseFileIdFromString(fileId)
@@ -67,20 +57,16 @@ func (c *ChunkCache) doGetChunk(fileId string) (data []byte) {
 		glog.Errorf("failed to parse file id %s", fileId)
 		return nil
 	}
+
 	for _, diskCache := range c.diskCaches {
-		data, err = diskCache.GetNeedle(fid.Key)
-		if err == storage.ErrorNotFound {
-			continue
-		}
-		if err != nil {
-			glog.Errorf("failed to read cache file %s id %s", diskCache.fileName, fileId)
-			continue
-		}
+		data := diskCache.getChunk(fid.Key)
 		if len(data) != 0 {
-			return
+			return data
 		}
 	}
+
 	return nil
+
 }
 
 func (c *ChunkCache) SetChunk(fileId string, data []byte) {
@@ -95,22 +81,8 @@ func (c *ChunkCache) SetChunk(fileId string, data []byte) {
 
 func (c *ChunkCache) doSetChunk(fileId string, data []byte) {
 
-	c.memCache.SetChunk(fileId, data)
-
-	if len(c.diskCaches) == 0 {
-		return
-	}
-
-	if c.diskCaches[0].fileSize+int64(len(data)) > c.diskCaches[0].sizeLimit {
-		t, resetErr := c.diskCaches[len(c.diskCaches)-1].Reset()
-		if resetErr != nil {
-			glog.Errorf("failed to reset cache file %s", c.diskCaches[len(c.diskCaches)-1].fileName)
-			return
-		}
-		for i := len(c.diskCaches) - 1; i > 0; i-- {
-			c.diskCaches[i] = c.diskCaches[i-1]
-		}
-		c.diskCaches[0] = t
+	if len(data) < memCacheSizeLimit {
+		c.memCache.SetChunk(fileId, data)
 	}
 
 	fid, err := needle.ParseFileIdFromString(fileId)
@@ -118,7 +90,14 @@ func (c *ChunkCache) doSetChunk(fileId string, data []byte) {
 		glog.Errorf("failed to parse file id %s", fileId)
 		return
 	}
-	c.diskCaches[0].WriteNeedle(fid.Key, data)
+
+	if len(data) < onDiskCacheSizeLimit0 {
+		c.diskCaches[0].setChunk(fid.Key, data)
+	} else if len(data) < onDiskCacheSizeLimit1 {
+		c.diskCaches[1].setChunk(fid.Key, data)
+	} else {
+		c.diskCaches[2].setChunk(fid.Key, data)
+	}
 
 }
 
@@ -129,6 +108,6 @@ func (c *ChunkCache) Shutdown() {
 	c.Lock()
 	defer c.Unlock()
 	for _, diskCache := range c.diskCaches {
-		diskCache.Shutdown()
+		diskCache.shutdown()
 	}
 }

@@ -21,6 +21,7 @@ import (
 	_ "github.com/chrislusf/seaweedfs/weed/filer2/etcd"
 	_ "github.com/chrislusf/seaweedfs/weed/filer2/leveldb"
 	_ "github.com/chrislusf/seaweedfs/weed/filer2/leveldb2"
+	_ "github.com/chrislusf/seaweedfs/weed/filer2/mongodb"
 	_ "github.com/chrislusf/seaweedfs/weed/filer2/mysql"
 	_ "github.com/chrislusf/seaweedfs/weed/filer2/postgres"
 	_ "github.com/chrislusf/seaweedfs/weed/filer2/redis"
@@ -45,6 +46,7 @@ type FilerOption struct {
 	DataCenter         string
 	DefaultLevelDbDir  string
 	DisableHttp        bool
+	Host               string
 	Port               uint32
 	recursiveDelete    bool
 	Cipher             bool
@@ -73,7 +75,7 @@ func NewFilerServer(defaultMux, readonlyMux *http.ServeMux, option *FilerOption)
 		glog.Fatal("master list is required!")
 	}
 
-	fs.filer = filer2.NewFiler(option.Masters, fs.grpcDialOption, option.Port+10000, option.Collection, option.DefaultReplication, fs.notifyMetaListeners)
+	fs.filer = filer2.NewFiler(option.Masters, fs.grpcDialOption, option.Host, option.Port, option.Collection, option.DefaultReplication, fs.notifyMetaListeners)
 	fs.filer.Cipher = option.Cipher
 
 	maybeStartMetrics(fs, option)
