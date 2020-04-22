@@ -56,6 +56,7 @@ func (f *Filer) logMetaEvent(fullpath string, eventNotification *filer_pb.EventN
 	event := &filer_pb.SubscribeMetadataResponse{
 		Directory:         dir,
 		EventNotification: eventNotification,
+		TsNs:              time.Now().UnixNano(),
 	}
 	data, err := proto.Marshal(event)
 	if err != nil {
@@ -63,7 +64,7 @@ func (f *Filer) logMetaEvent(fullpath string, eventNotification *filer_pb.EventN
 		return
 	}
 
-	f.metaLogBuffer.AddToBuffer([]byte(dir), data)
+	f.MetaLogBuffer.AddToBuffer([]byte(dir), data)
 
 }
 
@@ -77,47 +78,4 @@ func (f *Filer) logFlushFunc(startTime, stopTime time.Time, buf []byte) {
 	if err := f.appendToFile(targetFile, buf); err != nil {
 		glog.V(0).Infof("log write failed %s: %v", targetFile, err)
 	}
-}
-
-func (f *Filer) ReadLogBuffer(lastReadTime time.Time, eachEventFn func(fullpath string, eventNotification *filer_pb.EventNotification) error) (newLastReadTime time.Time, err error) {
-
-	var buf []byte
-	newLastReadTime, buf = f.metaLogBuffer.ReadFromBuffer(lastReadTime)
-	var processedTs int64
-
-	for pos := 0; pos+4 < len(buf); {
-
-		size := util.BytesToUint32(buf[pos : pos+4])
-		entryData := buf[pos+4 : pos+4+int(size)]
-
-		logEntry := &filer_pb.LogEntry{}
-		err = proto.Unmarshal(entryData, logEntry)
-		if err != nil {
-			glog.Errorf("unexpected unmarshal filer_pb.LogEntry: %v", err)
-			return lastReadTime, fmt.Errorf("unexpected unmarshal filer_pb.LogEntry: %v", err)
-		}
-
-		event := &filer_pb.SubscribeMetadataResponse{}
-		err = proto.Unmarshal(logEntry.Data, event)
-		if err != nil {
-			glog.Errorf("unexpected unmarshal filer_pb.SubscribeMetadataResponse: %v", err)
-			return lastReadTime, fmt.Errorf("unexpected unmarshal filer_pb.SubscribeMetadataResponse: %v", err)
-		}
-
-		err = eachEventFn(event.Directory, event.EventNotification)
-
-		processedTs = logEntry.TsNs
-
-		if err != nil {
-			newLastReadTime = time.Unix(0, processedTs)
-			return
-		}
-
-		pos += 4 + int(size)
-
-	}
-
-	newLastReadTime = time.Unix(0, processedTs)
-	return
-
 }

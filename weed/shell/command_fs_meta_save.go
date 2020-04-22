@@ -101,7 +101,7 @@ func (c *commandFsMetaSave) Do(args []string, commandEnv *CommandEnv, writer io.
 }
 
 /// 以 BFS 方式 遍历 并且 调用 saveFn 保存
-func doTraverseBfsAndSaving(commandEnv *CommandEnv, writer io.Writer, path string, verbose bool, saveFn func(outputChan chan interface{}), genFn func(entry *filer_pb.FullEntry, outputChan chan interface{}) error) error {
+func doTraverseBfsAndSaving(filerClient filer_pb.FilerClient, writer io.Writer, path string, verbose bool, saveFn func(outputChan chan interface{}), genFn func(entry *filer_pb.FullEntry, outputChan chan interface{}) error) error {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -115,7 +115,7 @@ func doTraverseBfsAndSaving(commandEnv *CommandEnv, writer io.Writer, path strin
 	var dirCount, fileCount uint64
 
 	/// 以 BFS 方式 列出 目录下 的 所有 文件, 并 调用 函数 , 如果 目录下的文件 还是 目录 则将 子目录 入队列
-	err := doTraverseBfs(writer, commandEnv, util.FullPath(path), func(parentPath util.FullPath, entry *filer_pb.Entry) {
+	err := filer_pb.TraverseBfs(filerClient, util.FullPath(path), func(parentPath util.FullPath, entry *filer_pb.Entry) {
 
 		protoMessage := &filer_pb.FullEntry{
 			Dir:   string(parentPath),
@@ -148,63 +148,4 @@ func doTraverseBfsAndSaving(commandEnv *CommandEnv, writer io.Writer, path strin
 		fmt.Fprintf(writer, "total %d directories, %d files\n", dirCount, fileCount)
 	}
 	return err
-}
-
-/// 以 BFS 方式 遍历
-func doTraverseBfs(writer io.Writer, filerClient filer_pb.FilerClient, parentPath util.FullPath, fn func(parentPath util.FullPath, entry *filer_pb.Entry)) (err error) {
-
-	K := 5
-
-	var jobQueueWg sync.WaitGroup
-	queue := util.NewQueue()
-	jobQueueWg.Add(1)
-	/// 根目录 入队
-	queue.Enqueue(parentPath)
-	var isTerminating bool
-
-	for i := 0; i < K; i++ {
-		go func() {
-			for {
-				if isTerminating {
-					break
-				}
-				t := queue.Dequeue()
-				if t == nil {
-					time.Sleep(329 * time.Millisecond)
-					continue
-				}
-				dir := t.(util.FullPath)
-				/// 列出 目录下 的 所有 文件, 并 回调 fn , 如果 目录下的文件 还是 目录 则将 子目录 入队列
-				processErr := processOneDirectory(writer, filerClient, dir, queue, &jobQueueWg, fn)
-				if processErr != nil {
-					err = processErr
-				}
-				jobQueueWg.Done()
-			}
-		}()
-	}
-	jobQueueWg.Wait()
-	isTerminating = true
-	return
-}
-
-func processOneDirectory(writer io.Writer, filerClient filer_pb.FilerClient, parentPath util.FullPath, queue *util.Queue, jobQueueWg *sync.WaitGroup, fn func(parentPath util.FullPath, entry *filer_pb.Entry)) (err error) {
-
-	/// 列出 目录下 的 所有 文件
-	return filer_pb.ReadDirAllEntries(filerClient, parentPath, "", func(entry *filer_pb.Entry, isLast bool) {
-
-		/// 调用 fn
-		fn(parentPath, entry)
-
-		if entry.IsDirectory {
-			subDir := fmt.Sprintf("%s/%s", parentPath, entry.Name)
-			if parentPath == "/" {
-				subDir = "/" + entry.Name
-			}
-			/// 保存 子目录
-			jobQueueWg.Add(1)
-			queue.Enqueue(util.FullPath(subDir))
-		}
-	})
-
 }

@@ -79,9 +79,15 @@ func doUploadData(uploadUrl string, filename string, cipher bool, data []byte, i
 	contentIsGzipped := isInputGzipped
 	shouldGzipNow := false
 	if !isInputGzipped {
+		if mtype == "" {
+			mtype = http.DetectContentType(data)
+			if mtype == "application/octet-stream" {
+				mtype = ""
+			}
+		}
 		if shouldBeZipped, iAmSure := util.IsGzippableFileType(filepath.Base(filename), mtype); iAmSure && shouldBeZipped {
 			shouldGzipNow = true
-		} else if len(data) > 128 {
+		} else if !iAmSure && mtype == "" && len(data) > 128 {
 			var compressed []byte
 			compressed, err = util.GzipData(data[0:128])
 			shouldGzipNow = len(compressed)*10 < 128*9 // can not compress to less than 90%

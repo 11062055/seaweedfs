@@ -32,6 +32,7 @@ const (
 )
 
 type MasterOption struct {
+	Host                    string
 	Port                    int
 	MetaFolder              string
 	VolumeSizeLimitMB       uint
@@ -95,7 +96,7 @@ func NewMasterServer(r *mux.Router, option *MasterOption, peers []string) *Maste
 		preallocateSize: preallocateSize,
 		clientChans:     make(map[string]chan *master_pb.VolumeLocation),
 		grpcDialOption:  grpcDialOption,
-		MasterClient:    wdclient.NewMasterClient(grpcDialOption, "master", 0, peers),
+		MasterClient:    wdclient.NewMasterClient(grpcDialOption, "master", option.Host, 0, peers),
 	}
 	/// 当代理请求到 master 去时, 该 channel 用于控制最多多少个并发请求可以代理到 master, 防止太多请求打垮 master
 	ms.bounedLeaderChan = make(chan int, 16)
