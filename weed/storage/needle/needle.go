@@ -48,8 +48,10 @@ func (n *Needle) String() (str string) {
 	return
 }
 
+/// 读取 一个 volume needle 数据, 包括 数据 和 附加信息
 func CreateNeedleFromRequest(r *http.Request, fixJpgOrientation bool, sizeLimit int64) (n *Needle, originalSize int, e error) {
 	n = new(Needle)
+	/// 从 http 请求中 读取 数据
 	pu, e := ParseUpload(r, sizeLimit)
 	if e != nil {
 		return
@@ -115,6 +117,7 @@ func CreateNeedleFromRequest(r *http.Request, fixJpgOrientation bool, sizeLimit 
 
 	return
 }
+/// fid 的格式 fid_delta
 func (n *Needle) ParsePath(fid string) (err error) {
 	length := len(fid)
 	if length <= CookieSize*2 {
@@ -125,6 +128,7 @@ func (n *Needle) ParsePath(fid string) (err error) {
 	if deltaIndex > 0 {
 		fid, delta = fid[0:deltaIndex], fid[deltaIndex+1:]
 	}
+	/// [NeedleId(8字节)][Cookie(8字节)]
 	n.Id, n.Cookie, err = ParseNeedleIdCookie(fid)
 	if err != nil {
 		return err
@@ -141,6 +145,7 @@ func (n *Needle) ParsePath(fid string) (err error) {
 
 /// 从 字符串 中反解出 needle id 和 cookie ,CookieSize = 4, 最后 8 个字节 是 cookie
 /// needle id 和 cookie 实际是 64 位 和 32 位 的 无符号 整型
+/// [NeedleId(8字节)][Cookie(8字节)]
 func ParseNeedleIdCookie(key_hash_string string) (NeedleId, Cookie, error) {
 	if len(key_hash_string) <= CookieSize*2 {
 		return NeedleIdEmpty, 0, fmt.Errorf("KeyHash is too short.")

@@ -69,6 +69,12 @@ func NewVolumeServer(adminMux, publicMux *http.ServeMux, ip string,
 	}
 	vs.SeedMasterNodes = masterNodes
 	/// 读取 store 信息, 会递归加载 所有目录下的 volume 信息 Store -> DiskLocation -> Volume
+	/// 从 .vif 文件中 解析 得到 VolumeInfo
+	/// 从 .dat 文件中 加载 得到 各个 needle 数据信息
+	/// 从 .dat 文件中读取超级块 信息
+	/// 从 .idx 文件中 获取 索引信息, 并保存 在 leveldb 中
+	/// 将 .idx 中的文件 的相关 数据 遍历 到 metric 中去
+	/// 并获取 最大 的 file key, 统计 所有文件总的 大小, 删除 文件 总的 次数, 删除 文件 总的 大小
 	vs.store = storage.NewStore(vs.grpcDialOption, port, ip, publicUrl, folders, maxCounts, vs.needleMapKind)
 
 	vs.guard = security.NewGuard(whiteList, signingKey, expiresAfterSec, readSigningKey, readExpiresAfterSec)
@@ -94,7 +100,7 @@ func NewVolumeServer(adminMux, publicMux *http.ServeMux, ip string,
 		publicMux.HandleFunc("/", vs.publicReadOnlyHandler)
 	}
 
-	/// 循环向 master 发送心跳
+	/// 循环向 master 发送心跳, 具体内容详见 doHeartbeat
 	go vs.heartbeat()
 	hostAddress := fmt.Sprintf("%s:%d", ip, port)
 	go stats.LoopPushingMetric("volumeServer", hostAddress, stats.VolumeServerGather,

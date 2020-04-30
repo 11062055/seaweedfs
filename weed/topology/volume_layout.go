@@ -197,6 +197,7 @@ func (vl *VolumeLayout) PickForWrite(count uint64, option *VolumeGrowOption) (*n
 					continue
 				}
 				counter++
+				/// return [0,n) 保证了一定会有返回值, 切概率均等
 				if rand.Intn(counter) < 1 {
 					vid, locationList = v, volumeLocationList
 				}
@@ -206,7 +207,7 @@ func (vl *VolumeLayout) PickForWrite(count uint64, option *VolumeGrowOption) (*n
 	return &vid, count, locationList, nil
 }
 
-/// 查看可写的 volume
+/// 从 可写 机器列表 查看 可写的 location, 定位 数据中心 机架 和 节点
 func (vl *VolumeLayout) GetActiveVolumeCount(option *VolumeGrowOption) int {
 	vl.accessLock.RLock()
 	defer vl.accessLock.RUnlock()

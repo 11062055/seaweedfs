@@ -111,7 +111,7 @@ func startMaster(masterOption MasterOptions, masterWhiteList []string) {
 	myMasterAddress, peers := checkPeers(*masterOption.ip, *masterOption.port, *masterOption.peers)
 
 	r := mux.NewRouter()
-	/// 初始化一个 master server 结构体
+	/// 初始化一个 master server 结构体, 这当中初始化 master 信息, 开始 routine 用于 master 之间相互通信
 	ms := weed_server.NewMasterServer(r, masterOption.toMasterOption(masterWhiteList), peers)
 	listeningAddress := *masterOption.ipBind + ":" + strconv.Itoa(*masterOption.port)
 	glog.V(0).Infof("Start Seaweed Master %s at %s", util.VERSION, listeningAddress)
@@ -136,7 +136,7 @@ func startMaster(masterOption MasterOptions, masterWhiteList []string) {
 		glog.Fatalf("master failed to listen on grpc port %d: %v", grpcPort, err)
 	}
 	// Create your protocol servers.
-	/// 生成一个 grpc server
+	/// 生成一个 grpc server, 对外暴露的是 http 接口 但是 master 之间 以及 master 和 volume 之间 是 通过 grpc 的方式进行通信的
 	grpcS := pb.NewGrpcServer(security.LoadServerTLS(util.GetViper(), "grpc.master"))
 
 	/// 将 grpc server 注册
@@ -147,7 +147,8 @@ func startMaster(masterOption MasterOptions, masterWhiteList []string) {
 	glog.V(0).Infof("Start Seaweed Master %s grpc server at %s:%d", util.VERSION, *masterOption.ipBind, grpcPort)
 	go grpcS.Serve(grpcL)
 
-	///
+	/// master client 向 leader master 发起 请求, 接收 volume 变动信息, 并且将数据保存在 master client 的 vidMap中
+	/// 问题是在哪里读取这些信息
 	go ms.MasterClient.KeepConnectedToMaster()
 
 	// start http server
@@ -157,6 +158,7 @@ func startMaster(masterOption MasterOptions, masterWhiteList []string) {
 	select {}
 }
 
+/// 只能 包含 奇数个 master
 func checkPeers(masterIp string, masterPort int, peers string) (masterAddress string, cleanedPeers []string) {
 	glog.V(0).Infof("current: %s:%d peers:%s", masterIp, masterPort, peers)
 	masterAddress = masterIp + ":" + strconv.Itoa(masterPort)

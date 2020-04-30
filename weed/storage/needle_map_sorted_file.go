@@ -24,7 +24,7 @@ func NewSortedFileNeedleMap(baseFileName string, indexFile *os.File) (m *SortedF
 	fileName := baseFileName + ".sdx"
 	if !isSortedFileFresh(fileName, indexFile) {
 		glog.V(0).Infof("Start to Generate %s from %s", fileName, indexFile.Name())
-		/// 将 idx 文件中的 数据首先读入 leveldb 中 , 然后按序读出 并且写入 .sdx 文件中去
+		/// 将 idx 文件中的 数据首先读入 leveldb 中 , 过滤掉已经删除的数据, 然后按序读出 并且写入 .sdx 文件中去
 		erasure_coding.WriteSortedFileFromIdx(baseFileName, ".sdx")
 		glog.V(0).Infof("Finished Generating %s from %s", fileName, indexFile.Name())
 	}
@@ -36,7 +36,8 @@ func NewSortedFileNeedleMap(baseFileName string, indexFile *os.File) (m *SortedF
 	dbStat, _ := m.dbFile.Stat()
 	m.dbFileSize = dbStat.Size()
 	glog.V(1).Infof("Loading %s...", indexFile.Name())
-	/// 将 .idx 中的文件 的相关 数据 遍历 到 metric 中去
+	/// 将 .idx 中的文件 的相关 数据 遍历 到 metric 中去, 用布隆过滤器查看 一个 needle 是否已经被处理过
+	/// 读取 最大 的 file key, 统计 所有文件总的 大小, 删除 文件 总的 次数, 删除 文件 总的 大小
 	mm, indexLoadError := newNeedleMapMetricFromIndexFile(indexFile)
 	if indexLoadError != nil {
 		return nil, indexLoadError

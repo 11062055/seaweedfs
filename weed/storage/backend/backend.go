@@ -45,6 +45,7 @@ var (
 )
 
 /// 在master.go中调用,目前只支持 type DiskFile struct {} 和 s3_backend, backend.BackendStorageFactories["s3"] = &S3BackendFactory{}
+/// 默认是不使用 backend storage 的
 // used by master to load remote storage configurations
 func LoadConfiguration(config *viper.Viper) {
 

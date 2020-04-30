@@ -50,12 +50,24 @@ func (s *Store) String() (str string) {
 
 /// 递归加载一个 store 的目录下的 volume
 /// Store -> DiskLocation -> Volume
+/// 从 .vif 文件中 解析 得到 VolumeInfo
+/// 从 .dat 文件中 加载 得到 各个 needle 数据信息
+/// 从 .dat 文件中读取超级块 信息
+/// 从 .idx 文件中 获取 索引信息, 并保存 在 leveldb 中
+/// 将 .idx 中的文件 的相关 数据 遍历 到 metric 中去
+/// 并获取 最大 的 file key, 统计 所有文件总的 大小, 删除 文件 总的 次数, 删除 文件 总的 大小
 func NewStore(grpcDialOption grpc.DialOption, port int, ip, publicUrl string, dirnames []string, maxVolumeCounts []int, needleMapKind NeedleMapType) (s *Store) {
 	s = &Store{grpcDialOption: grpcDialOption, Port: port, Ip: ip, PublicUrl: publicUrl, NeedleMapType: needleMapKind}
 	s.Locations = make([]*DiskLocation, 0)
 	for i := 0; i < len(dirnames); i++ {
 		location := NewDiskLocation(dirnames[i], maxVolumeCounts[i])
 		/// 递归加载 volume
+		/// 从 .vif 文件中 解析 得到 VolumeInfo
+		/// 从 .dat 文件中 加载 得到 各个 needle 数据信息
+		/// 从 .dat 文件中读取超级块 信息
+		/// 从 .idx 文件中 获取 索引信息, 并保存 在 leveldb 中
+		/// 将 .idx 中的文件 的相关 数据 遍历 到 metric 中去
+		/// 并获取 最大 的 file key, 统计 所有文件总的 大小, 删除 文件 总的 次数, 删除 文件 总的 大小
 		location.loadExistingVolumes(needleMapKind)
 		s.Locations = append(s.Locations, location)
 		stats.VolumeServerMaxVolumeCounter.Add(float64(maxVolumeCounts[i]))
@@ -207,6 +219,7 @@ func (s *Store) SetRack(rack string) {
 /// volume server 的 doHeartbeat 函数中调用, 用于向 master 打点报告, master 只关心 volume 信息
 /// 还有个作用就是 回收 本地过期的 volume
 /// Store->DiskLocation->Volume->Needle
+/// 各个 DiskLocation 中的 volume 总数, 最大的文件 key id, .dat 文件大小, FileCount DeleteCount DeletedSize 这类指标数据
 func (s *Store) CollectHeartbeat() *master_pb.Heartbeat {
 	var volumeMessages []*master_pb.VolumeInformationMessage
 	maxVolumeCount := 0
@@ -217,18 +230,23 @@ func (s *Store) CollectHeartbeat() *master_pb.Heartbeat {
 		maxVolumeCount = maxVolumeCount + location.MaxVolumeCount
 		location.volumesLock.RLock()
 		for _, v := range location.volumes {
+			/// 获取 最大 的 文件 key, 即文件 id
 			if maxFileKey < v.MaxFileKey() {
 				maxFileKey = v.MaxFileKey()
 			}
+			/// 没有过期
 			if !v.expired(s.GetVolumeSizeLimit()) {
+				/// 获取 .dat 文件大小, FileCount DeleteCount DeletedSize
 				volumeMessages = append(volumeMessages, v.ToVolumeInformationMessage())
 			} else {
+				/// 获取已经 删除 的 volume id
 				if v.expiredLongEnough(MAX_TTL_VOLUME_REMOVAL_DELAY) {
 					deleteVids = append(deleteVids, v.Id)
 				} else {
 					glog.V(0).Infoln("volume", v.Id, "is expired.")
 				}
 			}
+			/// 分别获取 .dat 文件的大小, 通过 stat 命令 获取原始文件的数据
 			fileSize, _, _ := v.FileStat()
 			collectionVolumeSize[v.Collection] += fileSize
 		}
@@ -238,6 +256,7 @@ func (s *Store) CollectHeartbeat() *master_pb.Heartbeat {
 			// delete expired volumes.
 			location.volumesLock.Lock()
 			for _, vid := range deleteVids {
+				/// 删除过期的 volume
 				found, err := location.deleteVolumeById(vid)
 				if found {
 					if err == nil {
@@ -255,6 +274,7 @@ func (s *Store) CollectHeartbeat() *master_pb.Heartbeat {
 		stats.VolumeServerDiskSizeGauge.WithLabelValues(col, "normal").Set(float64(size))
 	}
 
+	/// 统计本 节点 各个 DiskLocation 中的 volume 总数, 最大的文件 key id, .dat 文件大小, FileCount DeleteCount DeletedSize 这类指标数据
 	return &master_pb.Heartbeat{
 		Ip:             s.Ip,
 		Port:           uint32(s.Port),
@@ -296,7 +316,7 @@ func (s *Store) WriteVolumeNeedle(i needle.VolumeId, n *needle.Needle, fsync boo
 	return
 }
 
-/// 删除 一个 needle, 是以追加的方式, 在原文件后面追加一个 长度 为 0 的空数据块
+/// 删除 一个 needle, 是以追加的方式, 在原文件后面追加一个 长度 为 0 的空数据块, 并且写入 .idx 文件中
 func (s *Store) DeleteVolumeNeedle(i needle.VolumeId, n *needle.Needle) (uint32, error) {
 	if v := s.findVolume(i); v != nil {
 		if v.noWriteOrDelete {
@@ -311,7 +331,7 @@ func (s *Store) DeleteVolumeNeedle(i needle.VolumeId, n *needle.Needle) (uint32,
 	return 0, fmt.Errorf("volume %d not found on %s:%d", i, s.Ip, s.Port)
 }
 
-/// 从 volume 中读取一个 needle
+/// 从 volume .dat 中读取一个 needle
 func (s *Store) ReadVolumeNeedle(i needle.VolumeId, n *needle.Needle) (int, error) {
 	if v := s.findVolume(i); v != nil {
 		return v.readNeedle(n)
@@ -359,7 +379,7 @@ func (s *Store) MountVolume(i needle.VolumeId) error {
 	return fmt.Errorf("volume %d not found on disk", i)
 }
 
-/// 解挂卷 从 DiskLocation 的 卷列表中去除 但是不删除物理卷
+/// 解挂卷 从 DiskLocation 的 卷列表中去除 但是不删除物理卷, 在 doHeartBeat 中会向 master 报告该信息
 func (s *Store) UnmountVolume(i needle.VolumeId) error {
 	v := s.findVolume(i)
 	if v == nil {
@@ -385,7 +405,7 @@ func (s *Store) UnmountVolume(i needle.VolumeId) error {
 	return fmt.Errorf("volume %d not found on disk", i)
 }
 
-/// 物理删除 并从 DiskLocation 的卷列表中删除
+/// 物理删除 并从 DiskLocation 的卷列表中删除, 在 doHeartBeat 中会向 master 报告该信息
 func (s *Store) DeleteVolume(i needle.VolumeId) error {
 	v := s.findVolume(i)
 	if v == nil {
@@ -446,15 +466,22 @@ func (s *Store) GetVolumeSizeLimit() uint64 {
 	return atomic.LoadUint64(&s.volumeSizeLimit)
 }
 
+/// 计算 该 节点 的 最大可支持 volume 数目 MaxVolumeCount
+/// 根据 硬盘 剩余空间大小, 为每个 volume 预留 出足够大的空间, 然后计算还可以增加多少个 volume
 func (s *Store) MaybeAdjustVolumeMax() (hasChanges bool) {
 	volumeSizeLimit := s.GetVolumeSizeLimit()
 	for _, diskLocation := range s.Locations {
 		if diskLocation.MaxVolumeCount == 0 {
+			/// 获取文件系统信息, 包括 已使用\未使用 块数目, 块大小
 			diskStatus := stats.NewDiskStatus(diskLocation.Directory)
+			/// 统计 各个 volume 的未使用空间大小的和, 每个 volume 未使用空间大小 为 volumeSizeLimit - (.dat文件大小 + .idx文件大小)
 			unusedSpace := diskLocation.UnUsedSpace(volumeSizeLimit)
+			/// 这就是整个的 可扩展空间 大小
 			unclaimedSpaces := int64(diskStatus.Free) - int64(unusedSpace)
+			/// len(volumes)
 			volCount := diskLocation.VolumesLen()
 			maxVolumeCount := volCount
+			/// volume 的最大数目 增加 对应 大小
 			if unclaimedSpaces > int64(volumeSizeLimit) {
 				maxVolumeCount += int(uint64(unclaimedSpaces)/volumeSizeLimit) - 1
 			}

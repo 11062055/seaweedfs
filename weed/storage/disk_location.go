@@ -53,7 +53,13 @@ func parseCollectionVolumeId(base string) (collection string, vid needle.VolumeI
 	return collection, vol, err
 }
 
-/// load 获取生成 一个 volume
+/// load 获取生成 一个 volume,
+/// 从 .vif 文件中 解析 得到 VolumeInfo
+/// 从 .dat 文件中 加载 得到 各个 needle 数据信息
+/// 从 .dat 文件中读取超级块 信息
+/// 从 .idx 文件中 获取 索引信息, 并保存 在 leveldb 中
+/// 将 .idx 中的文件 的相关 数据 遍历 到 metric 中去
+/// 并获取 最大 的 file key, 统计 所有文件总的 大小, 删除 文件 总的 次数, 删除 文件 总的 大小
 func (l *DiskLocation) loadExistingVolume(fileInfo os.FileInfo, needleMapKind NeedleMapType) bool {
 	name := fileInfo.Name()
 	if !fileInfo.IsDir() && strings.HasSuffix(name, ".idx") {
@@ -72,6 +78,12 @@ func (l *DiskLocation) loadExistingVolume(fileInfo os.FileInfo, needleMapKind Ne
 			return true
 		}
 
+		/// 从 .vif 文件中 解析 得到 VolumeInfo
+		/// 从 .dat 文件中 加载 得到 各个 needle 数据信息
+		/// 从 .dat 文件中读取超级块 信息
+		/// 从 .idx 文件中 获取 索引信息, 并保存 在 leveldb 中
+		/// 将 .idx 中的文件 的相关 数据 遍历 到 metric 中去
+		/// 并获取 最大 的 file key, 统计 所有文件总的 大小, 删除 文件 总的 次数, 删除 文件 总的 大小
 		v, e := NewVolume(l.Directory, collection, vid, needleMapKind, nil, nil, 0, 0)
 		if e != nil {
 			glog.V(0).Infof("new volume %s error %s", name, e)
@@ -226,7 +238,7 @@ func (l *DiskLocation) UnloadVolume(vid needle.VolumeId) error {
 	return nil
 }
 
-/// 收集哪些 volume 需要 被 解挂
+/// 收集哪些 volume 需要 被 解挂, 从内存 volume 列表中删除
 func (l *DiskLocation) unmountVolumeByCollection(collectionName string) map[needle.VolumeId]*Volume {
 	deltaVols := make(map[needle.VolumeId]*Volume, 0)
 	for k, v := range l.volumes {
@@ -293,6 +305,7 @@ func (l *DiskLocation) LocateVolume(vid needle.VolumeId) (os.FileInfo, bool) {
 	return nil, false
 }
 
+/// 统计 各个 volume 的未使用空间大小的和, 每个 volume 未使用空间大小 为 volumeSizeLimit - (datSize + idxSize)
 func (l *DiskLocation) UnUsedSpace(volumeSizeLimit uint64) (unUsedSpace uint64) {
 
 	l.volumesLock.RLock()
@@ -302,6 +315,7 @@ func (l *DiskLocation) UnUsedSpace(volumeSizeLimit uint64) (unUsedSpace uint64) 
 		if vol.IsReadOnly() {
 			continue
 		}
+		/// 分别获取每个 volume 的 .dat .idx 文件的大小, 每个 volume 未使用的空间大小就是 volumeSizeLimit - (datSize + idxSize)
 		datSize, idxSize, _ := vol.FileStat()
 		unUsedSpace += volumeSizeLimit - (datSize + idxSize)
 	}

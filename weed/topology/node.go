@@ -44,6 +44,8 @@ type Node interface {
 
 	GetValue() interface{} //get reference to the topology,dc,rack,datanode
 }
+/// 虚拟节点 其中nodeType决定了是什么类型节点 比如nodeType是Topology时对应的value就是Topology结构体
+/// children 和 parent 用来构建整个 拓扑 结构
 type NodeImpl struct {
 	volumeCount       int64
 	remoteVolumeCount int64
@@ -61,7 +63,7 @@ type NodeImpl struct {
 	value    interface{}
 }
 
-/// 随机选择 有空闲 空间 的 node, 可能是 rack, data center, topology
+/// 随机选择 有空闲 空间 的 node, 可能是 rack, data center, topology, 第一个 node 必须满足 filterFirstNodeFn
 // the first node must satisfy filterFirstNodeFn(), the rest nodes must have one free slot
 func (n *NodeImpl) PickNodesByWeight(numberOfNodes int, filterFirstNodeFn func(dn Node) error) (firstNode Node, restNodes []Node, err error) {
 	var totalWeights int64
@@ -89,6 +91,7 @@ func (n *NodeImpl) PickNodesByWeight(numberOfNodes int, filterFirstNodeFn func(d
 	for i := 0; i < len(candidates); i++ {
 		weightsInterval := rand.Int63n(totalWeights)
 		lastWeights := int64(0)
+		/// 每次 总会选 至少一个出来
 		for k, weights := range candidatesWeights {
 			if (weightsInterval >= lastWeights) && (weightsInterval < lastWeights+weights) {
 				sortedCandidates = append(sortedCandidates, candidates[k])
@@ -103,6 +106,8 @@ func (n *NodeImpl) PickNodesByWeight(numberOfNodes int, filterFirstNodeFn func(d
 	restNodes = make([]Node, 0, numberOfNodes-1)
 	ret := false
 	n.RLock()
+	/// 存在有 一个 都 不会 返回 错误, 因为 ret 为 true
+	/// 但是 restNodes 不一定会满足 filterFirstNodeFn 条件
 	for k, node := range sortedCandidates {
 		if err := filterFirstNodeFn(node); err == nil {
 			firstNode = node
@@ -281,7 +286,7 @@ func (n *NodeImpl) GetMaxVolumeCount() int64 {
 	return n.maxVolumeCount
 }
 
-/// 加入一个 child node 并设置 父子关系
+/// 加入一个 child node 并设置 父子关系 并设置对应的 统计数据
 func (n *NodeImpl) LinkChildNode(node Node) {
 	n.Lock()
 	defer n.Unlock()
@@ -315,6 +320,7 @@ func (n *NodeImpl) UnlinkChildNode(nodeId NodeId) {
 }
 
 /// 收集空间满了的 节点, 在 StartRefreshWritableVolumes 中调用, 异步处理节点
+/// 每类逻辑节点都可调用该方法, 比如 Topology 也可以调用这个方法
 func (n *NodeImpl) CollectDeadNodeAndFullVolumes(freshThreshHold int64, volumeSizeLimit uint64) {
 	if n.IsRack() {
 		for _, c := range n.Children() {

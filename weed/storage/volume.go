@@ -46,6 +46,12 @@ type Volume struct {
 }
 
 /// 参数设置 并且加载 本地 或者 remote 的 .dat 文件
+/// 从 .vif 文件中 解析 得到 VolumeInfo
+/// 从 .dat 文件中 加载 得到 各个 needle 数据信息
+/// 从 .dat 文件中读取超级块 信息
+/// 从 .idx 文件中 获取 索引信息, 并保存 在 leveldb 中
+/// 将 .idx 中的文件 的相关 数据 遍历 到 metric 中去
+/// 并获取 最大 的 file key, 统计 所有文件总的 大小, 删除 文件 总的 次数, 删除 文件 总的 大小
 func NewVolume(dirname string, collection string, id needle.VolumeId, needleMapKind NeedleMapType, replicaPlacement *super_block.ReplicaPlacement, ttl *needle.TTL, preallocate int64, memoryMapMaxSizeMb uint32) (v *Volume, e error) {
 	// if replicaPlacement is nil, the superblock will be loaded from disk
 	v = &Volume{dir: dirname, Collection: collection, Id: id, MemoryMapMaxSizeMb: memoryMapMaxSizeMb}
@@ -78,6 +84,7 @@ func (v *Volume) Version() needle.Version {
 	return v.SuperBlock.Version
 }
 
+/// 分别获取 .dat 和 .idx 文件的大小, 都是通过 stat 命令 获取原始文件的数据
 func (v *Volume) FileStat() (datSize uint64, idxSize uint64, modTime time.Time) {
 	v.dataFileAccessLock.RLock()
 	defer v.dataFileAccessLock.RUnlock()
@@ -209,9 +216,12 @@ func (v *Volume) expiredLongEnough(maxDelayMinutes uint32) bool {
 	return false
 }
 
+/// 获取 .dat 文件大小, FileCount DeleteCount DeletedSize
 func (v *Volume) ToVolumeInformationMessage() *master_pb.VolumeInformationMessage {
+	/// size 是 通过 stat 命令获取的 .dat 文件大小
 	size, _, modTime := v.FileStat()
 
+	/// FileCount DeleteCount DeletedSize 是通过 内部 metrics 获取的
 	volumInfo := &master_pb.VolumeInformationMessage{
 		Id:               uint32(v.Id),
 		Size:             size,

@@ -15,7 +15,8 @@ func (t *Topology) StartRefreshWritableVolumes(grpcDialOption grpc.DialOption, g
 		for {
 			if t.IsLeader() {
 				freshThreshHold := time.Now().Unix() - 3*t.pulse //3 times of sleep interval
-				/// 会遍历本地所有 data node, 如果 该节点 已满, 则将节点 写入 chanFullVolumes, 会在 下面 SetVolumeCapacityFull 中处理
+				/// 会遍历本地内存中的所有 data node, 如果 该节点 已满, 则将节点 写入 chanFullVolumes, 会在 下面 SetVolumeCapacityFull 中处理
+				/// 将 超过 大小的 storage.VolumeInfo 写入 chanFullVolumes
 				t.CollectDeadNodeAndFullVolumes(freshThreshHold, t.volumeSizeLimit)
 			}
 			time.Sleep(time.Duration(float32(t.pulse*1e3)*(1+rand.Float32())) * time.Millisecond)
@@ -33,6 +34,7 @@ func (t *Topology) StartRefreshWritableVolumes(grpcDialOption grpc.DialOption, g
 	go func() {
 		for {
 			select {
+			/// channel 中 保存 的 是 storage.VolumeInfo
 			case v := <-t.chanFullVolumes:
 				/// 将 volume 从 volume layout 的可写文件列表中删除
 				t.SetVolumeCapacityFull(v)

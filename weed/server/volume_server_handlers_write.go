@@ -43,6 +43,7 @@ func (vs *VolumeServer) PostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	/// 读取 一个 volume needle 数据, 包括 数据 和 附加信息
 	needle, originalSize, ne := needle.CreateNeedleFromRequest(r, vs.FixJpgOrientation, vs.fileSizeLimitBytes)
 	if ne != nil {
 		writeJsonError(w, r, http.StatusBadRequest, ne)
@@ -146,7 +147,7 @@ func (vs *VolumeServer) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	/// 删除副本
+	/// 删除本地 的 和 副本, 同时 检查 副本 数目 是否 一致
 	_, err := topology.ReplicatedDelete(vs.GetMaster(), vs.store, volumeId, n, r)
 
 	writeDeleteResult(err, count, w, r)

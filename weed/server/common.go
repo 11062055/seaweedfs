@@ -155,6 +155,10 @@ func submitForClientHandler(w http.ResponseWriter, r *http.Request, masterUrl st
 	return
 }
 
+/// url 的格式
+/// /vid/fid/filename
+/// /vid/fid.ext
+/// /vid,fid.ext
 func parseURLPath(path string) (vid, fid, filename, ext string, isVolumeIdOnly bool) {
 	switch strings.Count(path, "/") {
 	case 3:

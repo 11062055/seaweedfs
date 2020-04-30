@@ -65,10 +65,12 @@ func (v *Volume) Destroy() (err error) {
 	return
 }
 
+/// 写入 needle 数据 到 .dat 和 .idx 文件中去
 func (v *Volume) writeNeedle(n *needle.Needle, fsync bool) (offset uint64, size uint32, isUnchanged bool, err error) {
 	// glog.V(4).Infof("writing needle %s", needle.NewFileIdFromNeedle(v.Id, n).String())
 	v.dataFileAccessLock.Lock()
 	defer v.dataFileAccessLock.Unlock()
+	/// 检测 needle 是否未改变, 先对比 cookie 再 对比 checksum 再 对比 data
 	if v.isFileUnchanged(n) {
 		size = n.DataSize
 		isUnchanged = true
@@ -97,7 +99,7 @@ func (v *Volume) writeNeedle(n *needle.Needle, fsync bool) (offset uint64, size 
 	}
 
 	// append to dat file
-	/// 追加到原始文件后面
+	/// 追加到原始 .dat 文件后面
 	n.AppendAtNs = uint64(time.Now().UnixNano())
 	if offset, size, _, err = n.Append(v.DataBackend, v.Version()); err != nil {
 		return

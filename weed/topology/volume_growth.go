@@ -48,6 +48,7 @@ func NewDefaultVolumeGrowth() *VolumeGrowth {
 
 // one replication type may need rp.GetCopyCount() actual volumes
 // given copyCount, how many logical volumes to create
+/// 问题是 实际 volume 和 逻辑 volume 的 区别是什么
 func (vg *VolumeGrowth) findVolumeCount(copyCount int) (count int) {
 	v := util.GetViper()
 	v.SetDefault("master.volume_growth.copy_1", 7)
@@ -71,7 +72,7 @@ func (vg *VolumeGrowth) findVolumeCount(copyCount int) (count int) {
 /// 最终调用 volume server 的 AllocateVolume
 func (vg *VolumeGrowth) AutomaticGrowByType(option *VolumeGrowOption, grpcDialOption grpc.DialOption, topo *Topology, targetCount int) (count int, err error) {
 	if targetCount == 0 {
-		/// 根据复制规则 决定 需要多少个 副本
+		/// 通过 实际 volume 数目 找到 逻辑 volume 的 数目
 		targetCount = vg.findVolumeCount(option.ReplicaPlacement.GetCopyCount())
 	}
 	count, err = vg.GrowByCountAndType(grpcDialOption, targetCount, option, topo)
@@ -138,6 +139,7 @@ func (vg *VolumeGrowth) findEmptySlotsForOneVolume(topo *Topology, option *Volum
 		if node.FreeSpace() < int64(rp.DiffRackCount+rp.SameRackCount+1) {
 			return fmt.Errorf("Free:%d < Expected:%d", node.FreeSpace(), rp.DiffRackCount+rp.SameRackCount+1)
 		}
+		/// 检查 rack 数目够不够
 		possibleRacksCount := 0
 		for _, rack := range node.Children() {
 			possibleDataNodesCount := 0
@@ -204,10 +206,12 @@ func (vg *VolumeGrowth) findEmptySlotsForOneVolume(topo *Topology, option *Volum
 		return nil, serverErr
 	}
 
+	/// 同一个 data center \ rack 中的 主节点, 和 其余满足条件的节点
 	servers = append(servers, mainServer.(*DataNode))
 	for _, server := range otherServers {
 		servers = append(servers, server.(*DataNode))
 	}
+	/// 同一个 data center 其余机架中每个机架一个节点
 	for _, rack := range otherRacks {
 		r := rand.Int63n(rack.FreeSpace())
 		/// 会递归调用 每个rack节点的子data节点 检查总计是否有 r 大小的空闲空间
@@ -217,9 +221,10 @@ func (vg *VolumeGrowth) findEmptySlotsForOneVolume(topo *Topology, option *Volum
 			return servers, e
 		}
 	}
+	/// 其它 data center 每个 data center 一个节点
 	for _, datacenter := range otherDataCenters {
 		r := rand.Int63n(datacenter.FreeSpace())
-		/// 会递归调用 每个datacenter节点的子rank节点 检查总计是否有 r 大小的空闲空间
+		/// 会递归调用 每个datacenter节点的子rank节点 检查总计是否有 r 大小的空闲空间, 然后获取 一个 data node
 		if server, e := datacenter.ReserveOneVolume(r); e == nil {
 			servers = append(servers, server)
 		} else {
@@ -241,9 +246,12 @@ func (vg *VolumeGrowth) grow(grpcDialOption grpc.DialOption, topo *Topology, vid
 				Ttl:              option.Ttl,
 				Version:          needle.CurrentVersion,
 			}
-			/// 记录 volume 的信息
+			/// 记录 volume 的信息, 更新相关统计数据
 			server.AddOrUpdateVolume(vi)
 			/// 并且更新到 volume layout 中去
+			/// 由于 AllocateVolume 实际是远程调用 volume server 的 AllocateVolume, volume server 会通过 SendHeartbeat 方式
+			/// 将新增的 volume 再次上报给 leader master, 然后 leader master 还会再次注册到 volume layout 中去
+			/// 并且 leader master 会 通过 KeepConnected 向其它 master 通知 新增加的 volume 信息, 这样 就实现了 数据的同步
 			topo.RegisterVolumeLayout(vi, server)
 			glog.V(0).Infoln("Created Volume", vid, "on", server.NodeImpl.String())
 		} else {

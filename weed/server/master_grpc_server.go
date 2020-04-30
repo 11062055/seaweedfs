@@ -51,6 +51,7 @@ func (ms *MasterServer) SendHeartbeat(stream master_pb.Seaweed_SendHeartbeatServ
 		}
 	}()
 
+	/// 循环接收 volume server 的 heart beat
 	for {
 		heartbeat, err := stream.Recv()
 		if err != nil {
@@ -62,18 +63,20 @@ func (ms *MasterServer) SendHeartbeat(stream master_pb.Seaweed_SendHeartbeatServ
 			return err
 		}
 
+		/// 也就说 每个 volume server 会通过这种方式将本地的最大的 volume id 上传, 这样的话所有 volume server 重启后, 就会自动得到最大的 volume id
 		t.Sequence.SetMax(heartbeat.MaxFileKey)
 
 		if dn == nil {
 			/// 从配置文件获取
 			dcName, rackName := t.Configuration.Locate(heartbeat.Ip, heartbeat.DataCenter, heartbeat.Rack)
-			/// 获取已有 或者 创建 data center \ rack \ data node
+			/// master 获取已有 或者 创建 data center \ rack \ data node
 			dc := t.GetOrCreateDataCenter(dcName)
 			rack := dc.GetOrCreateRack(rackName)
 			dn = rack.GetOrCreateDataNode(heartbeat.Ip,
 				int(heartbeat.Port), heartbeat.PublicUrl,
 				int64(heartbeat.MaxVolumeCount))
 			glog.V(0).Infof("added volume server %v:%d", heartbeat.GetIp(), heartbeat.GetPort())
+			/// 并通知 volume server 相关信息
 			if err := stream.Send(&master_pb.HeartbeatResponse{
 				VolumeSizeLimit:        uint64(ms.option.VolumeSizeLimitMB) * 1024 * 1024,
 				MetricsAddress:         ms.option.MetricsAddress,
@@ -85,6 +88,7 @@ func (ms *MasterServer) SendHeartbeat(stream master_pb.Seaweed_SendHeartbeatServ
 			}
 		}
 
+		/// 调节增量
 		if heartbeat.MaxVolumeCount != 0 && dn.GetMaxVolumeCount() != int64(heartbeat.MaxVolumeCount) {
 			delta := int64(heartbeat.MaxVolumeCount) - dn.GetMaxVolumeCount()
 			dn.UpAdjustMaxVolumeCountDelta(delta)
@@ -104,13 +108,13 @@ func (ms *MasterServer) SendHeartbeat(stream master_pb.Seaweed_SendHeartbeatServ
 				message.DeletedVids = append(message.DeletedVids, volInfo.Id)
 			}
 			// update master internal volume layouts
-			/// 增量通知 topology 和 node 更新 volume 信息
+			/// 增量通知 topology 和 node 更新 volume 信息, 即将新增和删除的volume信息更新 到 对应的 volume layout 中去
 			t.IncrementalSyncDataNodeRegistration(heartbeat.NewVolumes, heartbeat.DeletedVolumes, dn)
 		}
 
 		if len(heartbeat.Volumes) > 0 || heartbeat.HasNoVolumes {
 			// process heartbeat.Volumes
-			/// 更新节点 和 该节点的 volume 信息
+			/// 更新节点 和 该节点的 volume 信息, 即将新增和删除的volume信息更新 到 对应的 volume layout 中去
 			newVolumes, deletedVolumes := t.SyncDataNodeRegistration(heartbeat.Volumes, dn)
 
 			for _, v := range newVolumes {
@@ -160,6 +164,9 @@ func (ms *MasterServer) SendHeartbeat(stream master_pb.Seaweed_SendHeartbeatServ
 		}
 
 		/// 发送消息个所有的 channel, 这样所有消息都能在所有 master 之间传递了
+		/// master 之间 通过 KeepConnected 关联到 leader master, 每个 master 在 leader master 上关联一个 clientChans
+		/// 一旦 leader master 收到 volume server 的 SendHeartbeat 心跳请求知道 各个 volume server 上有数据变更时
+		/// 就向 clientChans 写入 消息, 这样 信息 就从 leader master 传向了 普通 master 了
 		if len(message.NewVids) > 0 || len(message.DeletedVids) > 0 {
 			ms.clientChansLock.RLock()
 			for host, ch := range ms.clientChans {
@@ -170,6 +177,7 @@ func (ms *MasterServer) SendHeartbeat(stream master_pb.Seaweed_SendHeartbeatServ
 		}
 
 		// tell the volume servers about the leader
+		/// 告诉 volume server 哪里是 leader master
 		newLeader, err := t.Leader()
 		if err != nil {
 			glog.Warningf("SendHeartbeat find leader: %v", err)
@@ -196,14 +204,16 @@ func (ms *MasterServer) KeepConnected(stream master_pb.Seaweed_KeepConnectedServ
 		return err
 	}
 
-	/// 如果不是 leader 则从 leader 处获取信息
+	/// 如果不是 leader 则从 raft server 中获取 leader 的位置信息并返回给 master client
 	if !ms.Topo.IsLeader() {
 		return ms.informNewLeader(stream)
 	}
 
+	/// 也就说 只有 leader master 才会执行下面的逻辑
 	peerAddress := findClientAddress(stream.Context(), req.GrpcPort)
 
 	// only one shell can be connected at any time
+	/// 同时只允许 一个 shell master client 连接到 leader master, 这里可能存在并发问题, 由于 master 之间请求并不频繁所以可以暂时忽略
 	if req.Name == pb.AdminShellClient {
 		if ms.currentAdminShellClient == "" {
 			ms.currentAdminShellClient = peerAddress
@@ -218,11 +228,13 @@ func (ms *MasterServer) KeepConnected(stream master_pb.Seaweed_KeepConnectedServ
 	stopChan := make(chan bool)
 
 	/// messageChan = make(chan *master_pb.VolumeLocation) 是在 SendHeartbeat 中写入的
+	/// 增加一个 master client, 并设置一个 channel, 用于异步步接收和通知该 client 相关信息
 	clientName, messageChan := ms.addClient(req.Name, peerAddress)
 
 	defer ms.deleteClient(clientName)
 
 	/// 获取 volume 信息
+	/// 把所有的 location 信息 返回给调用方, VolumeLocation 包含每个 data node 的 url 和上面有的 volume id
 	for _, message := range ms.Topo.ToVolumeLocations() {
 		if err := stream.Send(message); err != nil {
 			return err
@@ -242,6 +254,7 @@ func (ms *MasterServer) KeepConnected(stream master_pb.Seaweed_KeepConnectedServ
 	}()
 
 	ticker := time.NewTicker(5 * time.Second)
+	/// 循环将接收到的 volume 变化信息 从 messageChan 中读出来, 并且发送给 master client 以通知其余 master
 	for {
 		select {
 		/// 所有 volume data node 节点 的状态变化会通过 SendHeartbeat 发送给一个 master,
@@ -278,7 +291,7 @@ func (ms *MasterServer) informNewLeader(stream master_pb.Seaweed_KeepConnectedSe
 	return nil
 }
 
-/// 增加一个 master client, 并设置一个 channel, 用于移步接收和通知该 client 相关信息, SendHeartbeat 和 KeepConnected 中在使用
+/// 增加一个 master client, 并设置一个 channel, 用于异步步接收和通知该 client 相关信息, SendHeartbeat 和 KeepConnected 中在使用
 func (ms *MasterServer) addClient(clientType string, clientAddress string) (clientName string, messageChan chan *master_pb.VolumeLocation) {
 	clientName = clientType + "@" + clientAddress
 	glog.V(0).Infof("+ client %v", clientName)

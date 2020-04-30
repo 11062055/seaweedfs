@@ -27,7 +27,7 @@ func (ms *MasterServer) collectionDeleteHandler(w http.ResponseWriter, r *http.R
 	/// 列出所有的数据节点 会依次调用 Collection 和 VolumeLayout 的 ListVolumeServers 方法
 	for _, server := range collection.ListVolumeServers() {
 		err := operation.WithVolumeServerClient(server.Url(), ms.grpcDialOption, func(client volume_server_pb.VolumeServerClient) error {
-			/// 会调用 volume server 的 DeleteCollection 从 硬盘中删除数据
+			/// 会调用 volume server 的 DeleteCollection 从 硬盘中删除数据, 被删除的数据不会通过 heart beat 方式上报给 leader master
 			_, deleteErr := client.DeleteCollection(context.Background(), &volume_server_pb.DeleteCollectionRequest{
 				Collection: collection.Name,
 			})

@@ -61,6 +61,8 @@ func (ms *MasterServer) dirLookupHandler(w http.ResponseWriter, r *http.Request)
 }
 
 /// 根据 collection 和 volume id 查找位置
+/// 如果是 master 则从本地内存中 中读取, 否则 从 master client 中读取, 而 master client 中的数据是 通过 master 向 leader master
+/// 发送 KeepConnected 请求保持连接, 实时获取 vid 信息的.
 // findVolumeLocation finds the volume location from master topo if it is leader,
 // or from master client if not leader
 func (ms *MasterServer) findVolumeLocation(collection, vid string) operation.LookupResult {
@@ -82,7 +84,7 @@ func (ms *MasterServer) findVolumeLocation(collection, vid string) operation.Loo
 			}
 		}
 	} else {
-		/// 从 vidMap 中获取数据
+		/// 从 vidMap 中获取数据, 当中的数据是 master 之间 KeepConnected 获取的
 		machines, getVidLocationsErr := ms.MasterClient.GetVidLocations(vid)
 		for _, loc := range machines {
 			locations = append(locations, operation.Location{Url: loc.Url, PublicUrl: loc.PublicUrl})
@@ -119,7 +121,7 @@ func (ms *MasterServer) dirAssignHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	/// 如果对应数据中心\机架\节点没有可写的volume
+	/// 如果对应数据中心\机架\节点没有可写的volume, 实际是从 volume layout 的 writable 表中查看并获取对应的 数据 中心 和 机架 是否有空闲节点
 	if !ms.Topo.HasWritableVolume(option) {
 		if ms.Topo.FreeSpace() <= 0 {
 			writeJsonQuiet(w, r, http.StatusNotFound, operation.AssignResult{Error: "No free volumes left!"})
@@ -128,7 +130,7 @@ func (ms *MasterServer) dirAssignHandler(w http.ResponseWriter, r *http.Request)
 		ms.vgLock.Lock()
 		defer ms.vgLock.Unlock()
 		if !ms.Topo.HasWritableVolume(option) {
-			/// 如果没有可写节点, 就进行扩容
+			/// 如果没有可写节点, 就进行卷 volume 的扩容
 			if _, err = ms.vg.AutomaticGrowByType(option, ms.grpcDialOption, ms.Topo, writableVolumeCount); err != nil {
 				writeJsonError(w, r, http.StatusInternalServerError,
 					fmt.Errorf("Cannot grow volume group! %v", err))
@@ -136,6 +138,7 @@ func (ms *MasterServer) dirAssignHandler(w http.ResponseWriter, r *http.Request)
 			}
 		}
 	}
+	/// 从 volume layout 中的 可写 列表中 查寻一个满足条件的节点
 	fid, count, dn, err := ms.Topo.PickForWrite(requestedCount, option)
 	if err == nil {
 		ms.maybeAddJwtAuthorization(w, fid, true)

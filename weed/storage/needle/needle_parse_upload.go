@@ -27,6 +27,7 @@ type ParsedUpload struct {
 	UncompressedData []byte
 }
 
+/// 解析上传 的 volume 数据
 func ParseUpload(r *http.Request, sizeLimit int64) (pu *ParsedUpload, e error) {
 	pu = &ParsedUpload{}
 	pu.PairMap = make(map[string]string)
@@ -38,6 +39,7 @@ func ParseUpload(r *http.Request, sizeLimit int64) (pu *ParsedUpload, e error) {
 	}
 
 	if r.Method == "POST" {
+		/// 从 http 请求中 读取 数据
 		/// 读取 固定 大小 的 数据, 其余的丢弃, 保存 在 pu.Data 中
 		e = parseMultipart(r, sizeLimit, pu)
 	} else {

@@ -17,7 +17,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/util"
 )
 
-/// 写副本
+/// 写 本地 和 远端 副本
 func ReplicatedWrite(masterNode string, s *storage.Store, volumeId needle.VolumeId, n *needle.Needle, r *http.Request) (isUnchanged bool, err error) {
 
 	//check JWT
@@ -25,8 +25,9 @@ func ReplicatedWrite(masterNode string, s *storage.Store, volumeId needle.Volume
 
 	// check whether this is a replicated write request
 	var remoteLocations []operation.Location
+	/// 不是另一个 volume server 发过来的备份
 	if r.FormValue("type") != "replicate" {
-		/// 获取可写的远端副本位置
+		/// 获取可写的远端副本位置, 并检测 副本 数 是否 匹配
 		// this is the initial request
 		remoteLocations, err = getWritableRemoteReplications(s, volumeId, masterNode)
 		if err != nil {
@@ -95,7 +96,7 @@ func ReplicatedWrite(masterNode string, s *storage.Store, volumeId needle.Volume
 	return
 }
 
-/// 删除副本
+/// 删除本地 的 和 副本, 同时 检查 副本 数目 是否 一致
 func ReplicatedDelete(masterNode string, store *storage.Store,
 	volumeId needle.VolumeId, n *needle.Needle,
 	r *http.Request) (size uint32, err error) {
@@ -104,7 +105,9 @@ func ReplicatedDelete(masterNode string, store *storage.Store,
 	jwt := security.GetJwt(r)
 
 	var remoteLocations []operation.Location
+	/// 如果 type = replicate 则说明是 另一个 volume 发过来的删除请求
 	if r.FormValue("type") != "replicate" {
+		/// 从 master 获取 远端 副本的位置, 同时检查 副本数目 是否足够, 以确保彻底 删除
 		remoteLocations, err = getWritableRemoteReplications(store, volumeId, masterNode)
 		if err != nil {
 			glog.V(0).Infoln(err)
@@ -165,7 +168,7 @@ func distributedOperation(locations []operation.Location, store *storage.Store, 
 	return ret.Error()
 }
 
-/// 获取可写的远端副本位置
+/// 获取可写的远端副本位置, 并检测 副本 数 是否 匹配
 func getWritableRemoteReplications(s *storage.Store, volumeId needle.VolumeId, masterNode string) (
 	remoteLocations []operation.Location, err error) {
 

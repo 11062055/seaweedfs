@@ -92,7 +92,8 @@ func (mm *mapMetric) MaybeSetMaxFileKey(key NeedleId) {
 	}
 }
 
-/// 将 .idx 中的文件 的相关 数据 遍历 到 metric 中去
+/// 将 .idx 中的文件 的相关 数据 遍历 到 metric 中去, 第一个 函数用于 布隆过滤器 的初始化
+/// 读取 最大 的 file key, 统计 所有文件总的 大小, 删除 文件 总的 次数, 删除 文件 总的 大小
 func newNeedleMapMetricFromIndexFile(r *os.File) (mm *mapMetric, err error) {
 	mm = &mapMetric{}
 	var bf *bloom.BloomFilter

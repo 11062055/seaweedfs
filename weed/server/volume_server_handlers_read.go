@@ -34,6 +34,9 @@ func (vs *VolumeServer) GetOrHeadHandler(w http.ResponseWriter, r *http.Request)
 	defer func() { stats.VolumeServerRequestHistogram.WithLabelValues("get").Observe(time.Since(start).Seconds()) }()
 
 	n := new(needle.Needle)
+	/// /vid/fid/filename
+	/// /vid/fid.ext
+	/// /vid,fid.ext
 	vid, fid, filename, ext, _ := parseURLPath(r.URL.Path)
 
 	if !vs.maybeCheckJwtAuthorization(r, vid, fid, false) {
@@ -47,6 +50,7 @@ func (vs *VolumeServer) GetOrHeadHandler(w http.ResponseWriter, r *http.Request)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	/// fid的格式: fid_delta  其中 fid 的格式 [NeedleId(8字节)][Cookie(8字节)]
 	err = n.ParsePath(fid)
 	if err != nil {
 		glog.V(2).Infof("parsing fid %s: %v", r.URL.Path, err)
@@ -65,7 +69,7 @@ func (vs *VolumeServer) GetOrHeadHandler(w http.ResponseWriter, r *http.Request)
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		/// 查找 首先通过缓存 缓存中没有的话就发送请求
+		/// 查找 首先通过缓存 缓存中没有的话就向master发送请求, 进行 302 跳转
 		lookupResult, err := operation.Lookup(vs.GetMaster(), volumeId.String())
 		glog.V(2).Infoln("volume", volumeId, "found on", lookupResult, "error", err)
 		if err == nil && len(lookupResult.Locations) > 0 {
@@ -88,7 +92,7 @@ func (vs *VolumeServer) GetOrHeadHandler(w http.ResponseWriter, r *http.Request)
 	cookie := n.Cookie
 	var count int
 	if hasVolume {
-		/// 从 volume 中读取 needle
+		/// 从 volume .dat 中读取 needle
 		count, err = vs.store.ReadVolumeNeedle(volumeId, n)
 	} else if hasEcVolume {
 		count, err = vs.store.ReadEcShardNeedle(volumeId, n)
@@ -117,6 +121,7 @@ func (vs *VolumeServer) GetOrHeadHandler(w http.ResponseWriter, r *http.Request)
 			}
 		}
 	}
+	/// 对比 CheckSum
 	if inm := r.Header.Get("If-None-Match"); inm == "\""+n.Etag()+"\"" {
 		w.WriteHeader(http.StatusNotModified)
 		return
@@ -124,7 +129,7 @@ func (vs *VolumeServer) GetOrHeadHandler(w http.ResponseWriter, r *http.Request)
 	/// 设置响应中 http 头部 的 ETag
 	setEtag(w, n.Etag())
 
-	/// 设置响应中 http 头部 的 字段
+	/// 设置响应中 http 头部 的 K-V 字段
 	if n.HasPairs() {
 		pairMap := make(map[string]string)
 		err = json.Unmarshal(n.Pairs, &pairMap)
@@ -187,7 +192,7 @@ func (vs *VolumeServer) tryHandleChunkedFile(n *needle.Needle, fileName string, 
 		return false
 	}
 
-	/// 获取文件分块信息
+	/// 获取文件分块信息, Data 中存的实际是 ChunkManifest
 	chunkManifest, e := operation.LoadChunkManifest(n.Data, n.IsGzipped())
 	if e != nil {
 		glog.V(0).Infof("load chunked manifest (%s) error: %v", r.URL.Path, e)

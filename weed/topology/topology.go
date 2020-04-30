@@ -17,6 +17,7 @@ import (
 	"github.com/chrislusf/seaweedfs/weed/util"
 )
 
+/// Topology 也是 一个 虚拟节点 NodeImpl
 type Topology struct {
 	vacuumLockCounter int64
 	NodeImpl
@@ -39,6 +40,8 @@ type Topology struct {
 	RaftServer raft.Server
 }
 
+/// 比如 NewTopology("topo", seq, uint64(ms.option.VolumeSizeLimitMB)*1024*1024, ms.option.PulseSeconds, replicationAsMin)
+/// topology 也是一个 node, node 的 类型 为 Topology, node 的 value 是 topology,
 func NewTopology(id string, seq sequence.Sequencer, volumeSizeLimit uint64, pulse int, replicationAsMin bool) *Topology {
 	t := &Topology{}
 	t.id = NodeId(id)
@@ -237,7 +240,7 @@ func (t *Topology) SyncDataNodeRegistration(volumes []*master_pb.VolumeInformati
 	return
 }
 
-/// 更新 和 删除 volume 信息
+/// 更新 和 删除 volume 信息, 新增哪些 volume 和 删除了哪些 volume, 将信息更新到 volume layout 中去
 func (t *Topology) IncrementalSyncDataNodeRegistration(newVolumes, deletedVolumes []*master_pb.VolumeShortInformationMessage, dn *DataNode) {
 	var newVis, oldVis []storage.VolumeInfo
 	for _, v := range newVolumes {
@@ -260,7 +263,7 @@ func (t *Topology) IncrementalSyncDataNodeRegistration(newVolumes, deletedVolume
 	dn.DeltaUpdateVolumes(newVis, oldVis)
 
 	for _, vi := range newVis {
-		/// 注册 volume
+		/// 注册 volume 到 layout 中去
 		t.RegisterVolumeLayout(vi, dn)
 	}
 	for _, vi := range oldVis {

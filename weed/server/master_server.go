@@ -107,6 +107,7 @@ func NewMasterServer(r *mux.Router, option *MasterOption, peers []string) *Maste
 	}
 	/// 新建 拓扑
 	ms.Topo = topology.NewTopology("topo", seq, uint64(ms.option.VolumeSizeLimitMB)*1024*1024, ms.option.PulseSeconds, replicationAsMin)
+	/// 用于新增volume或者扩容
 	ms.vg = topology.NewDefaultVolumeGrowth()
 	glog.V(0).Infoln("Volume Size Limit is", ms.option.VolumeSizeLimitMB, "MB")
 
@@ -236,6 +237,7 @@ func (ms *MasterServer) startAdminScripts() {
 	reg, _ := regexp.Compile(`'.*?'|".*?"|\S+`)
 
 	/// master 之间保持连接 循环 更新 volume id 到 location 之间的对应关系
+	/// 实际是向 leader master 发起请求, 接收 volume id 变更数据 存在 master client 的 vidMap 中的
 	go commandEnv.MasterClient.KeepConnectedToMaster()
 
 	go func() {
@@ -272,7 +274,7 @@ func (ms *MasterServer) startAdminScripts() {
 	}()
 }
 
-/// 序列号生成器
+/// 序列号生成器, 默认使用 内存型的 序列号生成器
 func (ms *MasterServer) createSequencer(option *MasterOption) sequence.Sequencer {
 	var seq sequence.Sequencer
 	v := util.GetViper()

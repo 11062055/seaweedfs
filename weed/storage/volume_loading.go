@@ -23,9 +23,11 @@ func loadVolumeWithoutIndex(dirname string, collection string, id needle.VolumeI
 }
 
 /// 从 .vif 文件中 解析 得到 VolumeInfo
-/// 从 .dat 文件中 加载 得到 数据
+/// 从 .dat 文件中 加载 得到 各个 needle 数据信息
 /// 从 .dat 文件中读取超级块 信息
-/// 从 .idx 文件中 获取 索引信息
+/// 从 .idx 文件中 获取 索引信息, 并保存 在 leveldb 中
+/// 将 .idx 中的文件 的相关 数据 遍历 到 metric 中去
+/// 并获取 最大 的 file key, 统计 所有文件总的 大小, 删除 文件 总的 次数, 删除 文件 总的 大小
 func (v *Volume) load(alsoLoadIndex bool, createDatIfMissing bool, needleMapKind NeedleMapType, preallocate int64) (err error) {
 	fileName := v.FileName()
 	alreadyHasSuperBlock := false
@@ -98,14 +100,16 @@ func (v *Volume) load(alsoLoadIndex bool, createDatIfMissing bool, needleMapKind
 				return fmt.Errorf("cannot write Volume Index %s.idx: %v", fileName, err)
 			}
 		}
+		/// 读取 一个 needle 的所有数据和相关信息
 		if v.lastAppendAtNs, err = CheckVolumeDataIntegrity(v, indexFile); err != nil {
 			v.noWriteOrDelete = true
 			glog.V(0).Infof("volumeDataIntegrityChecking failed %v", err)
 		}
 
 		if v.IsReadOnly() {
-			/// 将 idx 文件中的 数据首先读入 leveldb 中 , 然后按序读出 并且写入 .sdx 文件中去
-			/// 将 .idx 中的文件 的相关 数据 遍历 到 metric 中去
+			/// 将 idx 文件中的 数据首先读入 leveldb 中 , 然后过滤掉已经删除的数据, 按序读出 并且写入 .sdx 文件中去 即静态 .idx 文件中去
+			/// 将 .idx 中的文件 的相关 数据 遍历 到 metric 中去, 用布隆过滤器查看 一个 needle 是否已经被处理过
+			/// 并读取 最大 的 file key, 统计 所有文件总的 大小, 删除 文件 总的 次数, 删除 文件 总的 大小
 			if v.nm, err = NewSortedFileNeedleMap(fileName, indexFile); err != nil {
 				glog.V(0).Infof("loading sorted db %s error: %v", fileName+".sdx", err)
 			}
@@ -123,6 +127,9 @@ func (v *Volume) load(alsoLoadIndex bool, createDatIfMissing bool, needleMapKind
 					WriteBuffer:                   1 * 1024 * 1024, // default value is 4MiB
 					CompactionTableSizeMultiplier: 10,              // default value is 1
 				}
+				/// 将 idx 文件中的 数据首先读入 leveldb 中
+				/// 将 .idx 中的文件 的相关 数据 遍历 到 metric 中去, 用布隆过滤器查看 一个 needle 是否已经被处理过
+				/// 并读取 最大 的 file key, 统计 所有文件总的 大小, 删除 文件 总的 次数, 删除 文件 总的 大小
 				if v.nm, err = NewLevelDbNeedleMap(fileName+".ldb", indexFile, opts); err != nil {
 					glog.V(0).Infof("loading leveldb %s error: %v", fileName+".ldb", err)
 				}

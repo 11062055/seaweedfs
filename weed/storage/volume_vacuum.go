@@ -186,6 +186,7 @@ func fetchCompactRevisionFromDatFile(datBackend backend.BackendStorageFile) (com
 }
 
 // if old .dat and .idx files are updated, this func tries to apply the same changes to new files accordingly
+/// 如果旧的 .idx .dat 文件更新了, 则将新增的数据 追加 到新的 .idx .dat 文件尾部
 func (v *Volume) makeupDiff(newDatFileName, newIdxFileName, oldDatFileName, oldIdxFileName string) (err error) {
 	var indexSize int64
 
@@ -290,6 +291,7 @@ func (v *Volume) makeupDiff(newDatFileName, newIdxFileName, oldDatFileName, oldI
 			if err != nil {
 				return fmt.Errorf("ReadNeedleBlob %s key %d offset %d size %d failed: %v", oldDatFile.Name(), key, increIdxEntry.offset.ToAcutalOffset(), increIdxEntry.size, err)
 			}
+			/// 写 .dat 文件
 			dst.Write(needleBytes)
 			util.Uint32toBytes(idxEntryBytes[8:12], uint32(offset/NeedlePaddingSize))
 		} else { //deleted needle
@@ -309,6 +311,7 @@ func (v *Volume) makeupDiff(newDatFileName, newIdxFileName, oldDatFileName, oldI
 			return fmt.Errorf("cannot seek end of indexfile %s: %v",
 				newIdxFileName, err)
 		}
+		/// 写 .idx 文件
 		_, err = idx.Write(idxEntryBytes)
 	}
 
