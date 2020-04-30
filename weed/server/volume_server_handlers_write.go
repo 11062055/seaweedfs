@@ -76,7 +76,7 @@ func (vs *VolumeServer) PostHandler(w http.ResponseWriter, r *http.Request) {
 	writeJsonQuiet(w, r, httpStatus, ret)
 }
 
-/// 删除 volume
+/// 删除 volume 中的 needle
 func (vs *VolumeServer) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	stats.VolumeServerRequestCounter.WithLabelValues("delete").Inc()
